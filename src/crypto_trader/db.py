@@ -306,6 +306,14 @@ class Database:
                 conn.execute("SELECT * FROM events ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
             )
 
+    def list_config_audit(self, limit: int = 25) -> list[sqlite3.Row]:
+        with self.connect() as conn:
+            return list(
+                conn.execute(
+                    "SELECT * FROM config_audit ORDER BY id DESC LIMIT ?", (limit,)
+                ).fetchall()
+            )
+
     def backup(self, dest: Path) -> None:
         dest.parent.mkdir(parents=True, exist_ok=True)
         with self.connect() as src, sqlite3.connect(dest) as dst:

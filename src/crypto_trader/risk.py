@@ -109,6 +109,20 @@ class RiskEngine:
         self.state.resume_weekly_floor = self.state.weekly_pnl
         self.state.resume_cumulative_floor = self.state.cumulative_pnl
 
+    def reset_daily(self) -> None:
+        self.state.daily_pnl = Decimal("0")
+        if self.state.halt_reason == HaltReason.DAILY_LOSS:
+            self.state.halt_reason = HaltReason.NONE
+            self.state.paused = False
+
+    def reset_risk_counters(self) -> None:
+        self.state.daily_pnl = Decimal("0")
+        self.state.weekly_pnl = Decimal("0")
+        self.state.cumulative_pnl = Decimal("0")
+        self.state.resume_weekly_floor = None
+        self.state.resume_cumulative_floor = None
+        self.manual_resume()
+
     @staticmethod
     def _breached(pnl: Decimal, limit: Decimal, floor: Decimal | None) -> bool:
         if pnl > -D(limit):

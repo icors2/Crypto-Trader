@@ -21,7 +21,7 @@ Agents update this file. It is the living snapshot of the project.
 
 ## Current focus
 
-- First product slice from `Crypto day-trader bot plan review.md`: paper loop, risk halts, healthcheck, settings UI, backtest/report extras.
+- Operator UI: dashboard + full trade blotter + admin (risk, stop/target, flatten, resets).
 
 ## Open questions
 

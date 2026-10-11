@@ -23,6 +23,7 @@ from crypto_trader.config import ConfigError, load_config, save_config
 from crypto_trader.db import Database
 from crypto_trader.health import Heartbeat
 from crypto_trader.loop import Engine
+from crypto_trader.models import ExitReason
 from crypto_trader.paper import PaperBroker
 from crypto_trader.reports import trade_report, trades_to_csv
 from crypto_trader.risk import RiskEngine
@@ -174,6 +175,9 @@ def create_app(runtime: Runtime | None = None, start_loop: bool = True) -> FastA
         resp.delete_cookie("session")
         return resp
 
+    def _notice(request: Request) -> str | None:
+        return request.query_params.get("notice")
+
     @app.get("/", response_class=HTMLResponse)
     def dashboard(request: Request) -> Response:
         denied = require_login(request)
@@ -181,7 +185,7 @@ def create_app(runtime: Runtime | None = None, start_loop: bool = True) -> FastA
             return denied
         snap = rt.health.snapshot()
         pos = rt.db.open_position()
-        trades = rt.db.list_trades(25)
+        trades = rt.db.list_trades(10)
         report = trade_report(rt.db.all_trades())
         return templates.TemplateResponse(
             request,
@@ -195,7 +199,22 @@ def create_app(runtime: Runtime | None = None, start_loop: bool = True) -> FastA
                 "risk": rt.risk.state,
                 "quote": rt.engine.last_quote,
                 "block_entries": rt.engine.block_entries,
+                "notice": _notice(request),
+                "events": rt.db.recent_events(8),
             },
+        )
+
+    @app.get("/trades", response_class=HTMLResponse)
+    def trades_page(request: Request) -> Response:
+        denied = require_login(request)
+        if denied:
+            return denied
+        trades = rt.db.list_trades(500)
+        report = trade_report(rt.db.all_trades())
+        return templates.TemplateResponse(
+            request,
+            "trades.html",
+            {"trades": trades, "report": report, "notice": _notice(request)},
         )
 
     @app.get("/settings", response_class=HTMLResponse)
@@ -206,7 +225,15 @@ def create_app(runtime: Runtime | None = None, start_loop: bool = True) -> FastA
         return templates.TemplateResponse(
             request,
             "settings.html",
-            {"cfg": rt.cfg, "env": rt.settings, "error": error},
+            {
+                "cfg": rt.cfg,
+                "env": rt.settings,
+                "error": error,
+                "notice": _notice(request),
+                "risk": rt.risk.state,
+                "position": rt.db.open_position(),
+                "audits": rt.db.list_config_audit(15),
+            },
         )
 
     @app.post("/settings")
@@ -234,8 +261,6 @@ def create_app(runtime: Runtime | None = None, start_loop: bool = True) -> FastA
             "max_failed_polls",
         }
         dec_fields = {
-            "stop_atr_mult",
-            "target_atr_mult",
             "max_notional_usd",
             "daily_loss_limit_usd",
             "weekly_loss_limit_usd",
@@ -245,6 +270,7 @@ def create_app(runtime: Runtime | None = None, start_loop: bool = True) -> FastA
             "dust_notional_usd",
             "paper_starting_cash",
         }
+        float_fields = {"stop_atr_mult", "target_atr_mult"}
         for key in (
             "mode",
             "symbol",
@@ -253,6 +279,7 @@ def create_app(runtime: Runtime | None = None, start_loop: bool = True) -> FastA
             "session_end",
             *int_fields,
             *dec_fields,
+            *float_fields,
             *bool_fields,
         ):
             if key not in form:
@@ -262,6 +289,8 @@ def create_app(runtime: Runtime | None = None, start_loop: bool = True) -> FastA
                 updates[key] = raw in {"1", "true", "on", "yes"}
             elif key in int_fields:
                 updates[key] = int(raw)
+            elif key in float_fields:
+                updates[key] = float(raw)
             elif key in dec_fields:
                 updates[key] = Decimal(raw)
             else:
@@ -276,7 +305,7 @@ def create_app(runtime: Runtime | None = None, start_loop: bool = True) -> FastA
         rt.broker.fee_bps = rt.cfg.fee_bps
         rt.broker.slippage_bps = rt.cfg.slippage_bps
         rt.db.record_config_audit(now_utc(), "ui", old, json.dumps(rt.cfg.as_public_dict()))
-        return RedirectResponse("/settings", status_code=303)
+        return RedirectResponse("/settings?notice=saved", status_code=303)
 
     @app.post("/halt")
     def halt(request: Request) -> Response:
@@ -285,7 +314,7 @@ def create_app(runtime: Runtime | None = None, start_loop: bool = True) -> FastA
             return denied
         rt.settings.stop_path.write_text("halt\n", encoding="utf-8")
         rt.alerts.send("manual halt", "STOP file written")
-        return RedirectResponse("/", status_code=303)
+        return RedirectResponse("/?notice=halted", status_code=303)
 
     @app.post("/resume")
     def resume(request: Request) -> Response:
@@ -296,7 +325,44 @@ def create_app(runtime: Runtime | None = None, start_loop: bool = True) -> FastA
             rt.settings.stop_path.unlink()
         rt.risk.manual_resume()
         rt.alerts.send("manual resume", "operator resumed trading")
-        return RedirectResponse("/", status_code=303)
+        return RedirectResponse("/?notice=resumed", status_code=303)
+
+    @app.post("/flatten")
+    def flatten(request: Request) -> Response:
+        denied = require_login(request)
+        if denied:
+            return denied
+        pos = rt.db.open_position()
+        quote = rt.engine.last_quote
+        if pos is None:
+            return RedirectResponse("/?notice=flat", status_code=303)
+        if quote is None:
+            return RedirectResponse("/settings?notice=no_quote", status_code=303)
+        rt.engine._close(pos, quote, ExitReason.MANUAL)
+        rt.alerts.send("manual flatten", f"closed {pos.symbol}")
+        return RedirectResponse("/trades?notice=flattened", status_code=303)
+
+    @app.post("/reset-daily")
+    def reset_daily(request: Request) -> Response:
+        denied = require_login(request)
+        if denied:
+            return denied
+        rt.risk.reset_daily()
+        rt.db.record_event("info", "reset_daily", "operator reset daily PnL", now_utc())
+        return RedirectResponse("/settings?notice=daily_reset", status_code=303)
+
+    @app.post("/reset-risk")
+    def reset_risk(request: Request) -> Response:
+        denied = require_login(request)
+        if denied:
+            return denied
+        if rt.settings.stop_path.exists():
+            rt.settings.stop_path.unlink()
+        rt.risk.reset_risk_counters()
+        rt.engine.cooldown_remaining = 0
+        rt.engine.block_entries = False
+        rt.db.record_event("info", "reset_risk", "operator reset risk counters", now_utc())
+        return RedirectResponse("/settings?notice=risk_reset", status_code=303)
 
     @app.get("/trades.csv")
     def export_csv(request: Request) -> Response:

@@ -11,11 +11,26 @@
     <div class="brand">Crypto day trader</div>
     <nav>
       <a href="/">Dashboard</a>
-      <a href="/settings">Settings</a>
+      <a href="/trades">Trades</a>
+      <a href="/settings">Admin</a>
       <a href="/trades.csv">CSV</a>
       <form method="post" action="/logout"><button type="submit">Log out</button></form>
     </nav>
   </header>
-  <main>{% block body %}{% endblock %}</main>
+  <main>
+    {% if notice %}
+      <p class="banner" role="status">
+        {% if notice == "saved" %}Settings saved. Open-position stop and target were left unchanged.{% endif %}
+        {% if notice == "halted" %}STOP file written. New entries are blocked.{% endif %}
+        {% if notice == "resumed" %}Resume acknowledged. STOP file cleared if it was present.{% endif %}
+        {% if notice == "flattened" %}Open position flattened at the last quote.{% endif %}
+        {% if notice == "flat" %}Already flat — nothing to flatten.{% endif %}
+        {% if notice == "no_quote" %}Cannot flatten without a live quote. Wait for the next poll.{% endif %}
+        {% if notice == "daily_reset" %}Daily PnL counter reset.{% endif %}
+        {% if notice == "risk_reset" %}Daily, weekly, and cumulative loss counters reset. Cooldown cleared.{% endif %}
+      </p>
+    {% endif %}
+    {% block body %}{% endblock %}
+  </main>
 </body>
 </html>

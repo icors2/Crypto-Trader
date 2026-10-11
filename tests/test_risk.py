@@ -38,3 +38,19 @@ def test_weekly_loss_requires_manual_resume():
     assert halt is HaltReason.WEEKLY_LOSS
     engine.manual_resume()
     assert engine.check(later) is HaltReason.NONE
+
+
+def test_operator_reset_clears_counters():
+    cfg = BotConfig(
+        daily_loss_limit_usd=Decimal("50"),
+        weekly_loss_limit_usd=Decimal("50"),
+        cumulative_loss_limit_usd=Decimal("50"),
+    )
+    engine = RiskEngine(cfg)
+    engine.record_realized(Decimal("-40"))
+    engine.reset_daily()
+    assert engine.state.daily_pnl == Decimal("0")
+    engine.record_realized(Decimal("-40"))
+    engine.reset_risk_counters()
+    assert engine.state.weekly_pnl == Decimal("0")
+    assert engine.state.manual_resume_required is False

@@ -1,48 +1,136 @@
 {% extends "base.html" %}
-{% block title %}Settings · Crypto day trader{% endblock %}
+{% block title %}Admin · Crypto day trader{% endblock %}
 {% block body %}
 <section class="card">
-  <h2>Strategy and risk</h2>
-  <p class="note">Hard ceilings from the environment: notional ≤ {{ env.max_notional_usd }}, daily ≤ {{ env.max_daily_loss_usd }}, weekly ≤ {{ env.max_weekly_loss_usd }}, cumulative ≤ {{ env.max_cumulative_loss_usd }}, poll ≥ {{ env.min_poll_interval_sec }}s. Saving does not rewrite stored stops on an open position.</p>
+  <h2>Admin · operator actions</h2>
+  <p class="note">Halt, resume, flatten, and reset risk counters. Changing stop ATR here does <strong>not</strong> rewrite an open position’s stored stop/target.</p>
+  {% if position %}
+    <p>Open: {{ position.qty }} {{ position.symbol }} @ {{ position.entry_price }} · stop {{ position.stop }} · target {{ position.target }}</p>
+  {% else %}
+    <p class="note">No open position.</p>
+  {% endif %}
+  <p class="note">Daily {{ risk.daily_pnl }} · weekly {{ risk.weekly_pnl }} · cumulative {{ risk.cumulative_pnl }} · halt {{ risk.halt_reason }}</p>
+  <div class="row">
+    <form method="post" action="/halt"><button class="danger" type="submit">Halt</button></form>
+    <form method="post" action="/resume"><button type="submit">Resume</button></form>
+    <form method="post" action="/flatten" onsubmit="return confirm('Flatten the open position at the last quote?');">
+      <button class="danger" type="submit" {% if not position %}disabled{% endif %}>Flatten</button>
+    </form>
+    <form method="post" action="/reset-daily" onsubmit="return confirm('Reset the daily PnL counter?');">
+      <button type="submit">Reset daily PnL</button>
+    </form>
+    <form method="post" action="/reset-risk" onsubmit="return confirm('Reset daily, weekly, and cumulative loss counters and clear cooldown?');">
+      <button class="danger" type="submit">Reset all risk counters</button>
+    </form>
+  </div>
+</section>
+
+<section class="card" style="margin-top:1rem">
+  <h2>Admin · settings</h2>
+  <p class="note">Hard ceilings from the environment: notional ≤ {{ env.max_notional_usd }}, daily ≤ {{ env.max_daily_loss_usd }}, weekly ≤ {{ env.max_weekly_loss_usd }}, cumulative ≤ {{ env.max_cumulative_loss_usd }}, poll ≥ {{ env.min_poll_interval_sec }}s.</p>
   {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
-  <form class="settings" method="post" action="/settings">
-    <div>
-      <label for="mode">Mode</label>
-      <select id="mode" name="mode">
-        <option value="paper" {% if cfg.mode == "paper" %}selected{% endif %}>paper</option>
-        <option value="live" {% if cfg.mode == "live" %}selected{% endif %}>live</option>
-      </select>
-    </div>
-    <div><label for="symbol">Symbol</label><input id="symbol" name="symbol" value="{{ cfg.symbol }}"></div>
-    <div><label for="ema_fast">Fast EMA</label><input id="ema_fast" name="ema_fast" type="number" value="{{ cfg.ema_fast }}"></div>
-    <div><label for="ema_slow">Slow EMA</label><input id="ema_slow" name="ema_slow" type="number" value="{{ cfg.ema_slow }}"></div>
-    <div><label for="atr_period">ATR period</label><input id="atr_period" name="atr_period" type="number" value="{{ cfg.atr_period }}"></div>
-    <div><label for="stop_atr_mult">Stop ATR mult</label><input id="stop_atr_mult" name="stop_atr_mult" value="{{ cfg.stop_atr_mult }}"></div>
-    <div><label for="target_atr_mult">Target ATR mult</label><input id="target_atr_mult" name="target_atr_mult" value="{{ cfg.target_atr_mult }}"></div>
-    <div><label for="poll_interval_sec">Poll interval (s)</label><input id="poll_interval_sec" name="poll_interval_sec" type="number" value="{{ cfg.poll_interval_sec }}"></div>
-    <div><label for="max_notional_usd">Max notional</label><input id="max_notional_usd" name="max_notional_usd" value="{{ cfg.max_notional_usd }}"></div>
-    <div><label for="daily_loss_limit_usd">Daily loss</label><input id="daily_loss_limit_usd" name="daily_loss_limit_usd" value="{{ cfg.daily_loss_limit_usd }}"></div>
-    <div><label for="weekly_loss_limit_usd">Weekly loss</label><input id="weekly_loss_limit_usd" name="weekly_loss_limit_usd" value="{{ cfg.weekly_loss_limit_usd }}"></div>
-    <div><label for="cumulative_loss_limit_usd">Cumulative loss</label><input id="cumulative_loss_limit_usd" name="cumulative_loss_limit_usd" value="{{ cfg.cumulative_loss_limit_usd }}"></div>
-    <div><label for="fee_bps">Fee (bps)</label><input id="fee_bps" name="fee_bps" type="number" value="{{ cfg.fee_bps }}"></div>
-    <div><label for="spread_max_bps">Max spread (bps)</label><input id="spread_max_bps" name="spread_max_bps" type="number" value="{{ cfg.spread_max_bps }}"></div>
-    <div><label for="cost_multiple">Cost multiple</label><input id="cost_multiple" name="cost_multiple" value="{{ cfg.cost_multiple }}"></div>
-    <div><label for="cooldown_bars">Cooldown bars</label><input id="cooldown_bars" name="cooldown_bars" type="number" value="{{ cfg.cooldown_bars }}"></div>
-    <div><label for="max_hold_minutes">Max hold (min)</label><input id="max_hold_minutes" name="max_hold_minutes" type="number" value="{{ cfg.max_hold_minutes }}"></div>
-    <div><label for="slippage_bps">Slippage (bps)</label><input id="slippage_bps" name="slippage_bps" type="number" value="{{ cfg.slippage_bps }}"></div>
-    <div><label for="session_start">Session start</label><input id="session_start" name="session_start" value="{{ cfg.session_start }}"></div>
-    <div><label for="session_end">Session end</label><input id="session_end" name="session_end" value="{{ cfg.session_end }}"></div>
-    <div><label for="timezone">Timezone</label><input id="timezone" name="timezone" value="{{ cfg.timezone }}"></div>
-    <div>
-      <label for="htf_filter_enabled">1h EMA filter</label>
-      <select id="htf_filter_enabled" name="htf_filter_enabled">
-        <option value="false" {% if not cfg.htf_filter_enabled %}selected{% endif %}>off</option>
-        <option value="true" {% if cfg.htf_filter_enabled %}selected{% endif %}>on</option>
-      </select>
-    </div>
-    <div class="row" style="grid-column: 1 / -1">
-      <button type="submit">Save</button>
+  <form class="admin" method="post" action="/settings">
+    <fieldset>
+      <legend>Mode and market</legend>
+      <div class="settings">
+        <div>
+          <label for="mode">Mode</label>
+          <select id="mode" name="mode">
+            <option value="paper" {% if cfg.mode == "paper" %}selected{% endif %}>paper</option>
+            <option value="live" {% if cfg.mode == "live" %}selected{% endif %}>live</option>
+          </select>
+        </div>
+        <div><label for="symbol">Symbol</label><input id="symbol" name="symbol" value="{{ cfg.symbol }}"></div>
+        <div><label for="timeframe_seconds">Bar size (sec)</label><input id="timeframe_seconds" name="timeframe_seconds" type="number" value="{{ cfg.timeframe_seconds }}"></div>
+        <div><label for="poll_interval_sec">Poll interval (s)</label><input id="poll_interval_sec" name="poll_interval_sec" type="number" value="{{ cfg.poll_interval_sec }}"></div>
+        <div><label for="timezone">Timezone</label><input id="timezone" name="timezone" value="{{ cfg.timezone }}"></div>
+        <div><label for="session_start">Session start</label><input id="session_start" name="session_start" value="{{ cfg.session_start }}"></div>
+        <div><label for="session_end">Session end</label><input id="session_end" name="session_end" value="{{ cfg.session_end }}"></div>
+        <div>
+          <label for="flatten_on_session_end">Flatten at session end</label>
+          <select id="flatten_on_session_end" name="flatten_on_session_end">
+            <option value="true" {% if cfg.flatten_on_session_end %}selected{% endif %}>yes</option>
+            <option value="false" {% if not cfg.flatten_on_session_end %}selected{% endif %}>no</option>
+          </select>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Stop loss and target</legend>
+      <div class="settings">
+        <div><label for="atr_period">ATR period</label><input id="atr_period" name="atr_period" type="number" value="{{ cfg.atr_period }}"></div>
+        <div><label for="stop_atr_mult">Stop ATR multiple</label><input id="stop_atr_mult" name="stop_atr_mult" value="{{ cfg.stop_atr_mult }}"></div>
+        <div><label for="target_atr_mult">Target ATR multiple</label><input id="target_atr_mult" name="target_atr_mult" value="{{ cfg.target_atr_mult }}"></div>
+        <div><label for="max_hold_minutes">Max hold (min)</label><input id="max_hold_minutes" name="max_hold_minutes" type="number" value="{{ cfg.max_hold_minutes }}"></div>
+        <div><label for="slippage_bps">Slippage (bps)</label><input id="slippage_bps" name="slippage_bps" type="number" value="{{ cfg.slippage_bps }}"></div>
+      </div>
+      <p class="note">These apply to the <em>next</em> entry. The open trade keeps the stop and target stored when it was opened.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Risk limits</legend>
+      <div class="settings">
+        <div><label for="max_notional_usd">Max notional (USD)</label><input id="max_notional_usd" name="max_notional_usd" value="{{ cfg.max_notional_usd }}"></div>
+        <div><label for="daily_loss_limit_usd">Daily loss</label><input id="daily_loss_limit_usd" name="daily_loss_limit_usd" value="{{ cfg.daily_loss_limit_usd }}"></div>
+        <div><label for="weekly_loss_limit_usd">Weekly loss</label><input id="weekly_loss_limit_usd" name="weekly_loss_limit_usd" value="{{ cfg.weekly_loss_limit_usd }}"></div>
+        <div><label for="cumulative_loss_limit_usd">Cumulative loss</label><input id="cumulative_loss_limit_usd" name="cumulative_loss_limit_usd" value="{{ cfg.cumulative_loss_limit_usd }}"></div>
+        <div><label for="paper_starting_cash">Paper starting cash</label><input id="paper_starting_cash" name="paper_starting_cash" value="{{ cfg.paper_starting_cash }}"></div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Strategy filters</legend>
+      <div class="settings">
+        <div><label for="ema_fast">Fast EMA</label><input id="ema_fast" name="ema_fast" type="number" value="{{ cfg.ema_fast }}"></div>
+        <div><label for="ema_slow">Slow EMA</label><input id="ema_slow" name="ema_slow" type="number" value="{{ cfg.ema_slow }}"></div>
+        <div><label for="fee_bps">Fee (bps)</label><input id="fee_bps" name="fee_bps" type="number" value="{{ cfg.fee_bps }}"></div>
+        <div><label for="spread_max_bps">Max spread (bps)</label><input id="spread_max_bps" name="spread_max_bps" type="number" value="{{ cfg.spread_max_bps }}"></div>
+        <div><label for="cost_multiple">Cost multiple</label><input id="cost_multiple" name="cost_multiple" value="{{ cfg.cost_multiple }}"></div>
+        <div><label for="cooldown_bars">Cooldown bars after stop</label><input id="cooldown_bars" name="cooldown_bars" type="number" value="{{ cfg.cooldown_bars }}"></div>
+        <div>
+          <label for="htf_filter_enabled">1h EMA filter</label>
+          <select id="htf_filter_enabled" name="htf_filter_enabled">
+            <option value="false" {% if not cfg.htf_filter_enabled %}selected{% endif %}>off</option>
+            <option value="true" {% if cfg.htf_filter_enabled %}selected{% endif %}>on</option>
+          </select>
+        </div>
+        <div><label for="htf_ema_period">HTF EMA period</label><input id="htf_ema_period" name="htf_ema_period" type="number" value="{{ cfg.htf_ema_period }}"></div>
+        <div><label for="htf_timeframe_seconds">HTF bar size (sec)</label><input id="htf_timeframe_seconds" name="htf_timeframe_seconds" type="number" value="{{ cfg.htf_timeframe_seconds }}"></div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Quotes and dust</legend>
+      <div class="settings">
+        <div><label for="stale_quote_sec">Stale quote (s)</label><input id="stale_quote_sec" name="stale_quote_sec" type="number" value="{{ cfg.stale_quote_sec }}"></div>
+        <div><label for="max_failed_polls">Failed polls before block</label><input id="max_failed_polls" name="max_failed_polls" type="number" value="{{ cfg.max_failed_polls }}"></div>
+        <div><label for="min_order_size">Min order size</label><input id="min_order_size" name="min_order_size" value="{{ cfg.min_order_size }}"></div>
+        <div><label for="dust_notional_usd">Dust notional (USD)</label><input id="dust_notional_usd" name="dust_notional_usd" value="{{ cfg.dust_notional_usd }}"></div>
+      </div>
+    </fieldset>
+
+    <div class="row">
+      <button type="submit">Save settings</button>
     </div>
   </form>
+</section>
+
+<section class="card" style="margin-top:1rem">
+  <h2>Config change audit</h2>
+  <table>
+    <thead><tr><th>When</th><th>Actor</th><th>After (excerpt)</th></tr></thead>
+    <tbody>
+    {% for a in audits %}
+      <tr>
+        <td>{{ a["ts"] }}</td>
+        <td>{{ a["actor"] }}</td>
+        <td class="note">{{ a["new_json"][:160] }}{% if a["new_json"]|length > 160 %}…{% endif %}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="3" class="note">No settings saves yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
 </section>
 {% endblock %}

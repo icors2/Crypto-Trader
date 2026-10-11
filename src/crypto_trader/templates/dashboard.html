@@ -6,13 +6,13 @@
     <h2>Health</h2>
     <div class="pill {{ 'ok' if health.ok else 'bad' }}">{{ health.status }}</div>
     <p class="note">Heartbeat age: {{ '%.1f'|format(health.heartbeat_age_sec or 0) }}s · paused {{ health.paused }}</p>
-    <p>Mode <strong>{{ cfg.mode }}</strong> · {{ cfg.symbol }} · {{ cfg.timezone }}</p>
+    <p>Mode <strong>{{ cfg.mode }}</strong> · {{ cfg.symbol }} · {{ cfg.timezone }} {{ cfg.session_start }}–{{ cfg.session_end }}</p>
   </article>
   <article class="card">
     <h2>Risk</h2>
     <p>Daily PnL <span class="stat">{{ risk.daily_pnl }}</span></p>
     <p class="note">Weekly {{ risk.weekly_pnl }} · cumulative {{ risk.cumulative_pnl }}</p>
-    <p class="note">Manual resume required: {{ risk.manual_resume_required }}</p>
+    <p class="note">Manual resume required: {{ risk.manual_resume_required }} · halt {{ risk.halt_reason }}</p>
   </article>
   <article class="card">
     <h2>Quote</h2>
@@ -35,12 +35,16 @@
 </section>
 
 <section class="card" style="margin-top:1rem">
-  <h2>Controls</h2>
+  <h2>Operator controls</h2>
   <div class="row">
-    <form method="post" action="/halt"><button class="danger" type="submit">Write STOP</button></form>
+    <form method="post" action="/halt"><button class="danger" type="submit">Halt (STOP file)</button></form>
     <form method="post" action="/resume"><button type="submit">Resume</button></form>
+    <form method="post" action="/flatten" onsubmit="return confirm('Flatten the open position at the last quote?');">
+      <button class="danger" type="submit" {% if not position %}disabled{% endif %}>Flatten position</button>
+    </form>
+    <a class="btn" href="/settings">Open admin</a>
   </div>
-  <p class="note">STOP file lives in <code>data/STOP</code>. Weekly/cumulative halts need Resume.</p>
+  <p class="note">STOP lives in <code>data/STOP</code>. Weekly/cumulative halts need Resume. Flatten uses the last bid/ask — it does not change stored stops on other trades.</p>
 </section>
 
 <section class="card" style="margin-top:1rem">
@@ -56,22 +60,49 @@
 </section>
 
 <section class="card" style="margin-top:1rem">
-  <h2>Recent trades</h2>
+  <h2>Latest trades</h2>
+  <p class="note"><a href="/trades">Full blotter</a> · <a href="/trades.csv">Download CSV</a> (fees and cost basis included)</p>
   <table>
-    <thead><tr><th>When</th><th>Qty</th><th>Entry</th><th>Exit</th><th>PnL</th><th>Fees</th><th>Reason</th></tr></thead>
+    <thead>
+      <tr>
+        <th>Closed</th><th>Symbol</th><th>Qty</th><th>Entry</th><th>Exit</th>
+        <th>PnL</th><th>Fees</th><th>Cost basis</th><th>Why</th>
+      </tr>
+    </thead>
     <tbody>
     {% for t in trades %}
       <tr>
         <td>{{ t.closed_at }}</td>
+        <td>{{ t.symbol }}</td>
         <td>{{ t.qty }}</td>
         <td>{{ t.entry_price }}</td>
         <td>{{ t.exit_price }}</td>
         <td>{{ t.pnl }}</td>
         <td>{{ t.entry_fee }} + {{ t.exit_fee }}</td>
+        <td>{{ t.cost_basis }}</td>
         <td>{{ t.reason }}</td>
       </tr>
     {% else %}
-      <tr><td colspan="7" class="note">No fills yet.</td></tr>
+      <tr><td colspan="9" class="note">No fills yet. Paper mode will list every closed round trip here.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="card" style="margin-top:1rem">
+  <h2>Recent events</h2>
+  <table>
+    <thead><tr><th>When</th><th>Level</th><th>Kind</th><th>Message</th></tr></thead>
+    <tbody>
+    {% for e in events %}
+      <tr>
+        <td>{{ e["ts"] }}</td>
+        <td>{{ e["level"] }}</td>
+        <td>{{ e["kind"] }}</td>
+        <td>{{ e["message"] }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="4" class="note">No alerts or skips logged yet.</td></tr>
     {% endfor %}
     </tbody>
   </table>
