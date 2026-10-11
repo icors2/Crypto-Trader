@@ -29,6 +29,7 @@ from crypto_trader.reports import trade_report, trades_to_csv
 from crypto_trader.risk import RiskEngine
 from crypto_trader.settings import EnvSettings
 from crypto_trader.timeutil import now_utc
+from crypto_trader.universe import catalog_pairs, parse_symbols, resolve_universe
 
 log = logging.getLogger(__name__)
 TEMPLATES_DIR = Path(__file__).parent / "templates"
@@ -86,6 +87,24 @@ class Runtime:
         )
         self.start_loop = start_loop
         self.thread: threading.Thread | None = None
+        self.universe = catalog_pairs()
+
+    def refresh_universe(self) -> None:
+        robinhood_rows = None
+        coinbase_ids = None
+        try:
+            coinbase_ids = self.feed.list_usd_product_ids()
+        except Exception:  # noqa: BLE001
+            coinbase_ids = None
+        client = getattr(self.broker, "client", None)
+        if client is not None and hasattr(client, "get_trading_pairs"):
+            try:
+                robinhood_rows = client.get_trading_pairs()
+            except Exception:  # noqa: BLE001
+                robinhood_rows = None
+        self.universe = resolve_universe(robinhood_rows=robinhood_rows, coinbase_ids=coinbase_ids)
+        if not self.universe:
+            self.universe = catalog_pairs()
 
     def persist_paper(self) -> None:
         if not isinstance(self.broker, PaperBroker):
@@ -95,7 +114,7 @@ class Runtime:
     def paper_snapshot(self) -> dict[str, Any] | None:
         if not isinstance(self.broker, PaperBroker):
             return None
-        return paper_view(self.broker.to_account(), self.engine.last_quote)
+        return paper_view(self.broker.to_account(), self.engine.last_quotes or self.engine.last_quote)
 
     def boot_loop(self) -> None:
         if not self.start_loop:
@@ -195,7 +214,7 @@ def create_app(runtime: Runtime | None = None, start_loop: bool = True) -> FastA
         if denied:
             return denied
         snap = rt.health.snapshot()
-        pos = rt.db.open_position()
+        positions = rt.db.open_positions()
         trades = rt.db.list_trades(10)
         report = trade_report(rt.db.all_trades())
         return templates.TemplateResponse(
@@ -204,11 +223,14 @@ def create_app(runtime: Runtime | None = None, start_loop: bool = True) -> FastA
             {
                 "cfg": rt.cfg,
                 "health": snap,
-                "position": pos,
+                "position": positions[0] if positions else None,
+                "positions": positions,
+                "watchlist": rt.cfg.watchlist(),
                 "trades": trades,
                 "report": report,
                 "risk": rt.risk.state,
                 "quote": rt.engine.last_quote,
+                "quotes": rt.engine.last_quotes,
                 "block_entries": rt.engine.block_entries,
                 "notice": _notice(request),
                 "events": rt.db.recent_events(8),
@@ -244,6 +266,9 @@ def create_app(runtime: Runtime | None = None, start_loop: bool = True) -> FastA
                 "notice": _notice(request),
                 "risk": rt.risk.state,
                 "position": rt.db.open_position(),
+                "positions": rt.db.open_positions(),
+                "watchlist": rt.cfg.watchlist(),
+                "universe": rt.universe,
                 "audits": rt.db.list_config_audit(15),
                 "paper": rt.paper_snapshot(),
             },
@@ -272,6 +297,7 @@ def create_app(runtime: Runtime | None = None, start_loop: bool = True) -> FastA
             "slippage_bps",
             "stale_quote_sec",
             "max_failed_polls",
+            "max_open_positions",
         }
         dec_fields = {
             "max_notional_usd",
@@ -308,6 +334,13 @@ def create_app(runtime: Runtime | None = None, start_loop: bool = True) -> FastA
                 updates[key] = Decimal(raw)
             else:
                 updates[key] = raw
+        selected = [str(v) for v in form.getlist("symbols")]
+        extra = str(form.get("symbols_extra") or "")
+        if extra.strip():
+            selected.extend(extra.split(","))
+        if selected:
+            updates["symbols"] = parse_symbols(selected)
+            updates["symbol"] = updates["symbols"][0]
         old = json.dumps(rt.cfg.as_public_dict())
         try:
             rt.cfg = save_config(rt.settings.config_path, updates, rt.settings)
@@ -348,14 +381,21 @@ def create_app(runtime: Runtime | None = None, start_loop: bool = True) -> FastA
         denied = require_login(request)
         if denied:
             return denied
-        pos = rt.db.open_position()
-        quote = rt.engine.last_quote
-        if pos is None:
+        positions = rt.db.open_positions()
+        if not positions:
             return RedirectResponse("/?notice=flat", status_code=303)
-        if quote is None:
+        closed = 0
+        for pos in positions:
+            quote = rt.engine.last_quotes.get(pos.symbol) or (
+                rt.engine.last_quote if rt.engine.last_quote and rt.engine.last_quote.symbol == pos.symbol else None
+            )
+            if quote is None:
+                continue
+            rt.engine._close(pos, quote, ExitReason.MANUAL)
+            closed += 1
+        if closed == 0:
             return RedirectResponse("/settings?notice=no_quote", status_code=303)
-        rt.engine._close(pos, quote, ExitReason.MANUAL)
-        rt.alerts.send("manual flatten", f"closed {pos.symbol}")
+        rt.alerts.send("manual flatten", f"closed {closed} position(s)")
         return RedirectResponse("/trades?notice=flattened", status_code=303)
 
     @app.post("/reset-daily")
@@ -375,8 +415,9 @@ def create_app(runtime: Runtime | None = None, start_loop: bool = True) -> FastA
         if rt.settings.stop_path.exists():
             rt.settings.stop_path.unlink()
         rt.risk.reset_risk_counters()
-        rt.engine.cooldown_remaining = 0
+        rt.engine.cooldown_remaining = {}
         rt.engine.block_entries = False
+        rt.engine.block_entry_symbols.clear()
         rt.db.record_event("info", "reset_risk", "operator reset risk counters", now_utc())
         return RedirectResponse("/settings?notice=risk_reset", status_code=303)
 
@@ -500,8 +541,9 @@ def create_app(runtime: Runtime | None = None, start_loop: bool = True) -> FastA
             if rt.settings.stop_path.exists():
                 rt.settings.stop_path.unlink()
             rt.risk.reset_risk_counters()
-            rt.engine.cooldown_remaining = 0
+            rt.engine.cooldown_remaining = {}
             rt.engine.block_entries = False
+            rt.engine.block_entry_symbols.clear()
         rt.db.record_event(
             "info",
             "paper_reset",
@@ -509,6 +551,15 @@ def create_app(runtime: Runtime | None = None, start_loop: bool = True) -> FastA
             now_utc(),
         )
         return RedirectResponse("/settings?notice=paper_reset", status_code=303)
+
+    @app.post("/universe/refresh")
+    def refresh_universe(request: Request) -> Response:
+        denied = require_login(request)
+        if denied:
+            return denied
+        rt.refresh_universe()
+        rt.db.record_event("info", "universe", f"loaded {len(rt.universe)} tradable pairs", now_utc())
+        return RedirectResponse("/settings?notice=universe_refreshed", status_code=303)
 
     @app.get("/trades.csv")
     def export_csv(request: Request) -> Response:

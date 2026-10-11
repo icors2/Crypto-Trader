@@ -5,7 +5,7 @@ from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 from crypto_trader.config import BotConfig
-from crypto_trader.models import HaltReason
+from crypto_trader.models import HaltReason, Position, PositionStatus, Quote
 from crypto_trader.risk import RiskEngine
 
 
@@ -54,3 +54,44 @@ def test_operator_reset_clears_counters():
     engine.reset_risk_counters()
     assert engine.state.weekly_pnl == Decimal("0")
     assert engine.state.manual_resume_required is False
+
+
+def test_daily_loss_sums_unrealized_across_coins():
+    cfg = BotConfig(
+        daily_loss_limit_usd=Decimal("20"),
+        weekly_loss_limit_usd=Decimal("500"),
+        cumulative_loss_limit_usd=Decimal("500"),
+    )
+    engine = RiskEngine(cfg)
+    ts = datetime(2026, 3, 9, 15, 0, tzinfo=ZoneInfo("America/Chicago")).astimezone(UTC)
+    positions = [
+        Position(
+            id=1,
+            symbol="BTC-USD",
+            qty=Decimal("1"),
+            entry_price=Decimal("100"),
+            stop=Decimal("90"),
+            target=Decimal("120"),
+            opened_at=ts,
+            entry_fee=Decimal("0"),
+            cost_basis=Decimal("100"),
+            status=PositionStatus.OPEN,
+        ),
+        Position(
+            id=2,
+            symbol="ETH-USD",
+            qty=Decimal("1"),
+            entry_price=Decimal("50"),
+            stop=Decimal("40"),
+            target=Decimal("80"),
+            opened_at=ts,
+            entry_fee=Decimal("0"),
+            cost_basis=Decimal("50"),
+            status=PositionStatus.OPEN,
+        ),
+    ]
+    quotes = {
+        "BTC-USD": Quote(ts=ts, symbol="BTC-USD", bid=Decimal("90"), ask=Decimal("91"), source="t"),
+        "ETH-USD": Quote(ts=ts, symbol="ETH-USD", bid=Decimal("40"), ask=Decimal("41"), source="t"),
+    }
+    assert engine.check(ts, positions, quotes) is HaltReason.DAILY_LOSS

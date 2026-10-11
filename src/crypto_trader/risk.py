@@ -52,11 +52,33 @@ class RiskEngine:
             return Decimal("0")
         return money((quote.bid - position.entry_price) * position.qty - position.entry_fee)
 
+    def book_unrealized(
+        self,
+        positions: list[Position] | Position | None,
+        quotes: dict[str, Quote] | Quote | None,
+    ) -> Decimal:
+        book: list[Position]
+        if positions is None:
+            book = []
+        elif isinstance(positions, list):
+            book = positions
+        else:
+            book = [positions]
+        qmap: dict[str, Quote] = {}
+        if isinstance(quotes, dict):
+            qmap = quotes
+        elif quotes is not None:
+            qmap = {quotes.symbol: quotes}
+        total = Decimal("0")
+        for pos in book:
+            total += self.unrealized(pos, qmap.get(pos.symbol))
+        return total
+
     def check(
         self,
         now,
-        position: Position | None = None,
-        quote: Quote | None = None,
+        position: Position | list[Position] | None = None,
+        quote: Quote | dict[str, Quote] | None = None,
         *,
         stop_file: bool = False,
         session_open: bool = True,
@@ -73,7 +95,7 @@ class RiskEngine:
             self.state.halt_reason = HaltReason.SESSION
             return HaltReason.SESSION
 
-        unreal = self.unrealized(position, quote)
+        unreal = self.book_unrealized(position, quote)
         daily = self.state.daily_pnl + unreal
         weekly = self.state.weekly_pnl + unreal
         cumulative = self.state.cumulative_pnl + unreal

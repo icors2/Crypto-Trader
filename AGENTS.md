@@ -85,7 +85,7 @@ Cursor does not keep chat history as memory. **Rules are the memory.**
 - **Lint:** `uv run ruff check .`
 - **Verify:** `npm run verify` (audit + secret scan + ruff + pytest)
 - **Verify a UI change:** log in, open `/` and `/settings`, confirm paper cash/equity, deposit or set cash, confirm `/healthz`, write/remove `data/STOP`
-- **Env vars (names):** `UI_PASSWORD_HASH` or `UI_PASSWORD`, `UI_SESSION_SECRET`, `MAX_NOTIONAL_USD`, `MAX_DAILY_LOSS_USD`, `MAX_WEEKLY_LOSS_USD`, `MAX_CUMULATIVE_LOSS_USD`, `ROBINHOOD_API_KEY`, `ROBINHOOD_PRIVATE_KEY`, `ROBINHOOD_ACCOUNT_NUMBER`, `NTFY_TOPIC`, `BIND_HOST`, `PORT`, `DATA_DIR`, `CONFIG_DIR`, `SECURE_COOKIES`, `CONTEXT7_API_KEY`
+- **Env vars (names):** `UI_PASSWORD_HASH` or `UI_PASSWORD`, `UI_SESSION_SECRET`, `MAX_NOTIONAL_USD`, `MAX_DAILY_LOSS_USD`, `MAX_WEEKLY_LOSS_USD`, `MAX_CUMULATIVE_LOSS_USD`, `MAX_OPEN_POSITIONS`, `ROBINHOOD_API_KEY`, `ROBINHOOD_PRIVATE_KEY`, `ROBINHOOD_ACCOUNT_NUMBER`, `NTFY_TOPIC`, `BIND_HOST`, `PORT`, `DATA_DIR`, `CONFIG_DIR`, `SECURE_COOKIES`, `CONTEXT7_API_KEY`
 - **MCP enabled:** context7 (library docs)
 - **Cloud install:** `uv sync --all-extras`
 - **Deploy:** local Docker / Tailscale. Compose binds `127.0.0.1:8000`. Rollback = previous image + restore `data/trader.db`.

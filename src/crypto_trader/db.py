@@ -282,11 +282,24 @@ class Database:
             ).fetchall()
         return [self._order_from_row(r) for r in rows]
 
-    def open_position(self) -> Position | None:
+    def open_positions(self) -> list[Position]:
         with self.connect() as conn:
-            row = conn.execute(
-                "SELECT * FROM positions WHERE status='open' ORDER BY id DESC LIMIT 1"
-            ).fetchone()
+            rows = conn.execute(
+                "SELECT * FROM positions WHERE status='open' ORDER BY id ASC"
+            ).fetchall()
+        return [self._position_from_row(r) for r in rows]
+
+    def open_position(self, symbol: str | None = None) -> Position | None:
+        with self.connect() as conn:
+            if symbol:
+                row = conn.execute(
+                    "SELECT * FROM positions WHERE status='open' AND symbol=? ORDER BY id DESC LIMIT 1",
+                    (symbol,),
+                ).fetchone()
+            else:
+                row = conn.execute(
+                    "SELECT * FROM positions WHERE status='open' ORDER BY id DESC LIMIT 1"
+                ).fetchone()
         return self._position_from_row(row) if row else None
 
     def insert_position(self, pos: Position) -> Position:

@@ -7,6 +7,13 @@ alwaysApply: false
 
 Record choices that later agents should not silently reverse. Newest first.
 
+## 2026-10-11 — Any Robinhood USD coin
+
+- **Decision:** The bot trades a watchlist of Robinhood USD pairs (`symbols` + `max_open_positions`), not a single hardcoded BTC market. Paper uses a catalog of RH pairs; live can refresh `GET /api/v2/crypto/trading/trading_pairs/` and keep `is_api_tradable` + `status=tradable`. Coinbase OHLC is still required, so the UI universe is intersected with Coinbase USD products when that list is reachable.
+- **Why:** Operator asked to trade any Robinhood coin. Indicators must stay on Coinbase candles (plan review).
+- **Alternatives rejected:** BTC-only; trading pairs with no Coinbase candles; unofficial RH asset scrapes.
+- **Revisit when:** Robinhood adds a quote currency other than USD, or Coinbase delists a pair that RH still trades.
+
 ## 2026-10-11 — Paper account is a full ledger
 
 - **Decision:** Paper cash, starting cash, and holdings persist in SQLite (`paper_account` + `paper_holdings`). Admin can set cash, deposit/withdraw, edit holdings, and reset to the starting baseline (optional history wipe + risk reset). Live mode is read-only for this panel.

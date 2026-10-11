@@ -63,6 +63,26 @@ class CoinbaseFeed:
         ts = datetime.now(tz=UTC)
         return Quote(ts=ts, symbol=symbol, bid=bid, ask=ask, source="coinbase")
 
+    def list_usd_product_ids(self) -> set[str]:
+        resp = self.client.get(
+            f"{COINBASE_EXCHANGE}/products",
+            headers={"User-Agent": "crypto-trader/0.1"},
+        )
+        self.last_date_header = resp.headers.get("Date")
+        if resp.status_code == 429:
+            raise CoinbaseError("429")
+        resp.raise_for_status()
+        ids: set[str] = set()
+        for row in resp.json():
+            if str(row.get("quote_currency") or "").upper() != "USD":
+                continue
+            if row.get("trading_disabled") or row.get("status") == "delisted":
+                continue
+            product_id = str(row.get("id") or "")
+            if product_id:
+                ids.add(product_id)
+        return ids
+
     def startup_clock_warning(self) -> str | None:
         try:
             resp = self.client.get(

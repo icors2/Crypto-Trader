@@ -21,7 +21,7 @@ Agents update this file. It is the living snapshot of the project.
 
 ## Current focus
 
-- Paper account is a persisted SQLite ledger. Admin can set cash, starting cash, deposit/withdraw, holdings, and reset.
+- Watchlist can include any Robinhood USD crypto (not BTC-only). Indicators still require a Coinbase product.
 
 ## Open questions
 

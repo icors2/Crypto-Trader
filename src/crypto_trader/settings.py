@@ -17,6 +17,7 @@ class EnvSettings(BaseSettings):
     max_weekly_loss_usd: Decimal = Field(default=Decimal("150"))
     max_cumulative_loss_usd: Decimal = Field(default=Decimal("300"))
     min_poll_interval_sec: int = Field(default=5)
+    max_open_positions: int = Field(default=10)
 
     ui_password_hash: str | None = None
     ui_password: str | None = None
@@ -49,6 +50,9 @@ class EnvSettings(BaseSettings):
 
     def cap_poll(self, requested: int) -> int:
         return max(int(requested), int(self.min_poll_interval_sec))
+
+    def cap_open_positions(self, requested: int) -> int:
+        return max(1, min(int(requested), int(self.max_open_positions)))
 
     @property
     def config_path(self) -> Path:

@@ -5,7 +5,11 @@
 <section class="card">
   <h2>Admin · operator actions</h2>
   <p class="note">Halt, resume, flatten, and reset risk counters. Changing stop ATR here does <strong>not</strong> rewrite an open position’s stored stop/target.</p>
-  {% if position %}
+  {% if positions %}
+    {% for position in positions %}
+      <p>Open: {{ position.qty }} {{ position.symbol }} @ {{ position.entry_price }} · stop {{ position.stop }} · target {{ position.target }}</p>
+    {% endfor %}
+  {% elif position %}
     <p>Open: {{ position.qty }} {{ position.symbol }} @ {{ position.entry_price }} · stop {{ position.stop }} · target {{ position.target }}</p>
   {% else %}
     <p class="note">No open position.</p>
@@ -14,8 +18,8 @@
   <div class="row">
     <form method="post" action="/halt"><button class="danger" type="submit">Halt</button></form>
     <form method="post" action="/resume"><button type="submit">Resume</button></form>
-    <form method="post" action="/flatten" onsubmit="return confirm('Flatten the open position at the last quote?');">
-      <button class="danger" type="submit" {% if not position %}disabled{% endif %}>Flatten</button>
+    <form method="post" action="/flatten" onsubmit="return confirm('Flatten open position(s) at the last quote?');">
+      <button class="danger" type="submit" {% if not positions and not position %}disabled{% endif %}>Flatten</button>
     </form>
     <form method="post" action="/reset-daily" onsubmit="return confirm('Reset the daily PnL counter?');">
       <button type="submit">Reset daily PnL</button>
@@ -110,7 +114,10 @@
 
 <section class="card" style="margin-top:1rem">
   <h2>Admin · settings</h2>
-  <p class="note">Hard ceilings from the environment: notional ≤ {{ env.max_notional_usd }}, daily ≤ {{ env.max_daily_loss_usd }}, weekly ≤ {{ env.max_weekly_loss_usd }}, cumulative ≤ {{ env.max_cumulative_loss_usd }}, poll ≥ {{ env.min_poll_interval_sec }}s.</p>
+  <p class="note">Hard ceilings from the environment: notional ≤ {{ env.max_notional_usd }}, daily ≤ {{ env.max_daily_loss_usd }}, weekly ≤ {{ env.max_weekly_loss_usd }}, cumulative ≤ {{ env.max_cumulative_loss_usd }}, poll ≥ {{ env.min_poll_interval_sec }}s, open positions ≤ {{ env.max_open_positions }}.</p>
+  <form method="post" action="/universe/refresh" class="row">
+    <button type="submit">Refresh Robinhood / Coinbase coin list</button>
+  </form>
   <form class="admin" method="post" action="/settings">
     <fieldset>
       <legend>Mode and market</legend>
@@ -122,7 +129,7 @@
             <option value="live" {% if cfg.mode == "live" %}selected{% endif %}>live</option>
           </select>
         </div>
-        <div><label for="symbol">Symbol</label><input id="symbol" name="symbol" value="{{ cfg.symbol }}"></div>
+        <div><label for="max_open_positions">Max open positions</label><input id="max_open_positions" name="max_open_positions" type="number" min="1" value="{{ cfg.max_open_positions }}"></div>
         <div><label for="timeframe_seconds">Bar size (sec)</label><input id="timeframe_seconds" name="timeframe_seconds" type="number" value="{{ cfg.timeframe_seconds }}"></div>
         <div><label for="poll_interval_sec">Poll interval (s)</label><input id="poll_interval_sec" name="poll_interval_sec" type="number" value="{{ cfg.poll_interval_sec }}"></div>
         <div><label for="timezone">Timezone</label><input id="timezone" name="timezone" value="{{ cfg.timezone }}"></div>
@@ -134,6 +141,33 @@
             <option value="true" {% if cfg.flatten_on_session_end %}selected{% endif %}>yes</option>
             <option value="false" {% if not cfg.flatten_on_session_end %}selected{% endif %}>no</option>
           </select>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Robinhood coins</legend>
+      <p class="note">Select any USD pair Robinhood lists. Indicators still come from Coinbase OHLC, so a pair needs a Coinbase product. Paper uses the built-in catalog; live can refresh the official trading-pairs list.</p>
+      <div class="coin-grid">
+        {% for pair in universe %}
+          <label class="coin">
+            <input type="checkbox" name="symbols" value="{{ pair.symbol }}" {% if pair.symbol in watchlist %}checked{% endif %}>
+            {{ pair.symbol }}
+          </label>
+        {% endfor %}
+        {% for symbol in watchlist %}
+          {% if universe | selectattr('symbol', 'equalto', symbol) | list | length == 0 %}
+            <label class="coin">
+              <input type="checkbox" name="symbols" value="{{ symbol }}" checked>
+              {{ symbol }}
+            </label>
+          {% endif %}
+        {% endfor %}
+      </div>
+      <div class="settings">
+        <div>
+          <label for="symbols_extra">Add pair (e.g. WIF-USD)</label>
+          <input id="symbols_extra" name="symbols_extra" placeholder="BONK-USD, PEPE-USD">
         </div>
       </div>
     </fieldset>

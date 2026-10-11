@@ -2,6 +2,9 @@
 
 mode: paper
 symbol: BTC-USD
+symbols:
+  - BTC-USD
+max_open_positions: 1
 timeframe_seconds: 300
 ema_fast: 9
 ema_slow: 21

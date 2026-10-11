@@ -34,6 +34,7 @@
         {% if notice == "paper_holding" %}Paper holding updated.{% endif %}
         {% if notice == "paper_reset" %}Paper account reset to starting cash. Holdings and open positions cleared.{% endif %}
         {% if notice == "paper_only" %}Paper ledger edits are available only in paper mode.{% endif %}
+        {% if notice == "universe_refreshed" %}Tradable coin list refreshed from Robinhood (when keyed) and Coinbase.{% endif %}
       </p>
     {% endif %}
     {% block body %}{% endblock %}

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
+from urllib.parse import urlencode
 
 from fastapi.testclient import TestClient
 
@@ -87,6 +88,10 @@ def test_dashboard_and_admin_and_trades(env_settings):
     assert b"Save paper account" in admin.content
     assert b"Deposit" in admin.content
     assert b"Reset paper account" in admin.content
+    assert b"Robinhood coins" in admin.content
+    assert b"ETH-USD" in admin.content
+    assert b"SOL-USD" in admin.content
+    assert b"Watchlist" in dash.content
 
 
 def test_admin_saves_stop_and_resets_risk(env_settings):
@@ -104,15 +109,39 @@ def test_admin_saves_stop_and_resets_risk(env_settings):
     assert rt.risk.state.daily_pnl == Decimal("0")
 
 
+def test_admin_saves_multi_coin_watchlist(env_settings):
+    client, rt = _logged_in(env_settings)
+    saved = client.post(
+        "/settings",
+        content=urlencode(
+            [
+                ("symbols", "ETH-USD"),
+                ("symbols", "SOL-USD"),
+                ("symbols", "DOGE-USD"),
+                ("max_open_positions", "3"),
+                ("symbols_extra", "WIF-USD"),
+            ]
+        ),
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        follow_redirects=False,
+    )
+    assert saved.status_code == 303
+    assert rt.cfg.watchlist() == ["ETH-USD", "SOL-USD", "DOGE-USD", "WIF-USD"]
+    assert rt.cfg.max_open_positions == 3
+    assert rt.cfg.symbol == "ETH-USD"
+
+
 def test_flatten_open_position(env_settings):
     client, rt = _logged_in(env_settings)
-    rt.engine.last_quote = Quote(
+    quote = Quote(
         ts=datetime.now(tz=UTC),
         symbol="BTC-USD",
         bid=Decimal("99"),
         ask=Decimal("100"),
         source="test",
     )
+    rt.engine.last_quote = quote
+    rt.engine.last_quotes = {"BTC-USD": quote}
     rt.db.insert_position(
         Position(
             id=None,

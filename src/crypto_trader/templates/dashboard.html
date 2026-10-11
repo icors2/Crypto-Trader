@@ -6,7 +6,8 @@
     <h2>Health</h2>
     <div class="pill {{ 'ok' if health.ok else 'bad' }}">{{ health.status }}</div>
     <p class="note">Heartbeat age: {{ '%.1f'|format(health.heartbeat_age_sec or 0) }}s · paused {{ health.paused }}</p>
-    <p>Mode <strong>{{ cfg.mode }}</strong> · {{ cfg.symbol }} · {{ cfg.timezone }} {{ cfg.session_start }}–{{ cfg.session_end }}</p>
+    <p>Mode <strong>{{ cfg.mode }}</strong> · {{ cfg.timezone }} {{ cfg.session_start }}–{{ cfg.session_end }}</p>
+    <p class="note">Watchlist: {{ watchlist | join(', ') }} · max open {{ cfg.max_open_positions }}</p>
   </article>
   <article class="card">
     <h2>Paper account</h2>
@@ -29,19 +30,26 @@
     <p class="note">Manual resume required: {{ risk.manual_resume_required }} · halt {{ risk.halt_reason }}</p>
   </article>
   <article class="card">
-    <h2>Quote</h2>
-    {% if quote %}
-      <p>Bid {{ quote.bid }} / Ask {{ quote.ask }}</p>
+    <h2>Quotes</h2>
+    {% if quotes %}
+      {% for symbol, q in quotes.items() %}
+        <p>{{ symbol }} {{ q.bid }} / {{ q.ask }} <span class="note">{{ q.source }}</span></p>
+      {% endfor %}
+      <p class="note">Entries blocked {{ block_entries }}</p>
+    {% elif quote %}
+      <p>{{ quote.symbol }} {{ quote.bid }} / {{ quote.ask }}</p>
       <p class="note">{{ quote.source }} · entries blocked {{ block_entries }}</p>
     {% else %}
       <p class="note">Waiting for first quote…</p>
     {% endif %}
   </article>
   <article class="card">
-    <h2>Open position</h2>
-    {% if position %}
-      <p>{{ position.qty }} @ {{ position.entry_price }}</p>
-      <p class="note">Stop {{ position.stop }} · target {{ position.target }} (stored at entry)</p>
+    <h2>Open positions</h2>
+    {% if positions %}
+      {% for position in positions %}
+        <p>{{ position.symbol }} {{ position.qty }} @ {{ position.entry_price }}</p>
+        <p class="note">Stop {{ position.stop }} · target {{ position.target }} (stored at entry)</p>
+      {% endfor %}
     {% else %}
       <p class="note">Flat</p>
     {% endif %}
@@ -53,8 +61,8 @@
   <div class="row">
     <form method="post" action="/halt"><button class="danger" type="submit">Halt (STOP file)</button></form>
     <form method="post" action="/resume"><button type="submit">Resume</button></form>
-    <form method="post" action="/flatten" onsubmit="return confirm('Flatten the open position at the last quote?');">
-      <button class="danger" type="submit" {% if not position %}disabled{% endif %}>Flatten position</button>
+    <form method="post" action="/flatten" onsubmit="return confirm('Flatten open position(s) at the last quote?');">
+      <button class="danger" type="submit" {% if not positions and not position %}disabled{% endif %}>Flatten positions</button>
     </form>
     <a class="btn" href="/settings">Open admin</a>
   </div>

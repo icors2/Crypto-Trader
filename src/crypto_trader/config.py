@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -9,10 +9,13 @@ from ruamel.yaml import YAML
 
 from crypto_trader.money import D
 from crypto_trader.settings import EnvSettings
+from crypto_trader.universe import normalize_symbol, parse_symbols
 
 YAML_FIELDS = (
     "mode",
     "symbol",
+    "symbols",
+    "max_open_positions",
     "timeframe_seconds",
     "ema_fast",
     "ema_slow",
@@ -49,6 +52,8 @@ YAML_FIELDS = (
 class BotConfig:
     mode: str = "paper"
     symbol: str = "BTC-USD"
+    symbols: list[str] = field(default_factory=list)
+    max_open_positions: int = 1
     timeframe_seconds: int = 300
     ema_fast: int = 9
     ema_slow: int = 21
@@ -79,10 +84,22 @@ class BotConfig:
     paper_starting_cash: Decimal = Decimal("10000")
     flatten_on_session_end: bool = True
 
+    def watchlist(self) -> list[str]:
+        selected = parse_symbols(self.symbols) if self.symbols else []
+        if not selected:
+            selected = [normalize_symbol(self.symbol)]
+        return selected
+
     def as_public_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {}
         for key, value in asdict(self).items():
-            out[key] = str(value) if isinstance(value, Decimal) else value
+            if key == "symbols":
+                out[key] = list(self.watchlist())
+            elif isinstance(value, Decimal):
+                out[key] = str(value)
+            else:
+                out[key] = value
+        out["symbol"] = self.watchlist()[0]
         return out
 
 
@@ -118,9 +135,16 @@ def _raw_to_config(raw: dict[str, Any]) -> BotConfig:
         value = raw[key]
         if key in _dec_fields():
             kwargs[key] = D(value)
+        elif key == "symbols":
+            kwargs[key] = parse_symbols(value)
         else:
             kwargs[key] = value
-    return BotConfig(**kwargs)
+    cfg = BotConfig(**kwargs)
+    if not cfg.symbols:
+        cfg.symbols = cfg.watchlist()
+    else:
+        cfg.symbol = cfg.watchlist()[0]
+    return cfg
 
 
 def validate_config(cfg: BotConfig, env: EnvSettings) -> BotConfig:
@@ -147,8 +171,13 @@ def validate_config(cfg: BotConfig, env: EnvSettings) -> BotConfig:
         errors.append("stale_quote_sec >= 5 and max_failed_polls >= 1")
     if cfg.max_notional_usd <= 0:
         errors.append("max_notional_usd must be positive")
-    if "-" not in cfg.symbol:
-        errors.append("symbol must look like BTC-USD")
+    try:
+        cfg.symbols = cfg.watchlist()
+        cfg.symbol = cfg.symbols[0]
+    except ValueError as exc:
+        errors.append(str(exc))
+    if cfg.max_open_positions < 1:
+        errors.append("max_open_positions must be >= 1")
     try:
         from crypto_trader.timeutil import parse_hhmm, zone
 
@@ -165,6 +194,7 @@ def validate_config(cfg: BotConfig, env: EnvSettings) -> BotConfig:
     cfg.weekly_loss_limit_usd = env.cap_weekly_loss(cfg.weekly_loss_limit_usd)
     cfg.cumulative_loss_limit_usd = env.cap_cumulative_loss(cfg.cumulative_loss_limit_usd)
     cfg.poll_interval_sec = env.cap_poll(cfg.poll_interval_sec)
+    cfg.max_open_positions = env.cap_open_positions(cfg.max_open_positions)
     return cfg
 
 
@@ -187,7 +217,9 @@ def save_config(path: Path, updates: dict[str, Any], env: EnvSettings) -> BotCon
     for key, value in updates.items():
         if key not in YAML_FIELDS:
             continue
-        if isinstance(value, Decimal):
+        if key == "symbols":
+            data[key] = parse_symbols(value)
+        elif isinstance(value, Decimal):
             data[key] = str(value)
         elif isinstance(value, bool):
             data[key] = value

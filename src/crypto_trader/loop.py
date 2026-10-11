@@ -59,11 +59,13 @@ class Engine:
         self._sleep = sleep or _sleep
         self.fatal_on_error = fatal_on_error
         self.stop_event = threading.Event()
-        self.failed_polls = 0
+        self.failed_polls: dict[str, int] = {}
         self.last_quote: Quote | None = None
-        self.cooldown_remaining = 0
-        self.last_bar_ts = None
+        self.last_quotes: dict[str, Quote] = {}
+        self.cooldown_remaining: dict[str, int] = {}
+        self.last_bar_ts: dict[str, object] = {}
         self.block_entries = False
+        self.block_entry_symbols: set[str] = set()
         self.config_mtime: float | None = None
 
     def run_forever(self) -> None:
@@ -129,48 +131,79 @@ class Engine:
         stop_file = self.settings.stop_path.exists()
         now = now_utc()
         session = is_session_open(now, self.cfg.timezone, self.cfg.session_start, self.cfg.session_end)
-        position = self.db.open_position()
-        quote = self._poll_quote()
-        halt = self.risk.check(now, position, quote, stop_file=stop_file, session_open=session)
+        watchlist = self.cfg.watchlist()
+        positions = self.db.open_positions()
+        manage_symbols = {pos.symbol for pos in positions} | set(watchlist)
+        quotes: dict[str, Quote] = {}
+        for symbol in manage_symbols:
+            quote = self._poll_quote(symbol)
+            if quote is not None:
+                quotes[symbol] = quote
+        self.last_quotes = quotes
+        if quotes:
+            self.last_quote = next(iter(quotes.values()))
+        halt = self.risk.check(now, positions, quotes, stop_file=stop_file, session_open=session)
         paused = halt is not HaltReason.NONE
         self.health.touch(paused=paused, reason=halt.value if paused else "ok")
-        if quote is None:
+        if not quotes and not positions:
             return
-        if position and halt in {HaltReason.STOP_FILE, HaltReason.DAILY_LOSS, HaltReason.WEEKLY_LOSS, HaltReason.CUMULATIVE_LOSS}:
-            # still manage exits while halted except we keep protecting the position
+        for position in positions:
+            quote = quotes.get(position.symbol)
+            if quote is None:
+                continue
             self._manage_position(position, quote, now)
-            return
-        if position:
-            self._manage_position(position, quote, now)
-            return
         if paused or self.block_entries:
             return
-        self._maybe_enter(quote, now)
+        open_now = {pos.symbol for pos in self.db.open_positions()}
+        slots = self.cfg.max_open_positions - len(open_now)
+        if slots <= 0:
+            return
+        for symbol in watchlist:
+            if slots <= 0:
+                break
+            if symbol in open_now or symbol in self.block_entry_symbols:
+                continue
+            quote = quotes.get(symbol)
+            if quote is None:
+                continue
+            opened = self._maybe_enter_symbol(symbol, quote, now)
+            if opened:
+                open_now.add(symbol)
+                slots -= 1
 
-    def _poll_quote(self) -> Quote | None:
+    def _poll_quote(self, symbol: str | None = None) -> Quote | None:
+        pair = symbol or self.cfg.watchlist()[0]
         try:
-            ticker = self.feed.get_ticker(self.cfg.symbol)
-            quote = self.broker.get_quote(self.cfg.symbol, ticker)
+            ticker = self.feed.get_ticker(pair)
+            quote = self.broker.get_quote(pair, ticker)
             self.db.record_quote(quote)
             self.last_quote = quote
-            self.failed_polls = 0
-            self.block_entries = False
+            self.last_quotes[pair] = quote
+            self.failed_polls[pair] = 0
+            self.block_entry_symbols.discard(pair)
+            self.block_entries = bool(self.block_entry_symbols)
             age = (now_utc() - quote.ts).total_seconds()
             if age > self.cfg.stale_quote_sec:
+                self.block_entry_symbols.add(pair)
                 self.block_entries = True
-                self.db.record_event("warning", "stale_quote", f"age={age:.1f}s", now_utc())
-                self.alerts.send("stale quote", f"{self.cfg.symbol} age {age:.1f}s")
+                self.db.record_event("warning", "stale_quote", f"{pair} age={age:.1f}s", now_utc())
+                self.alerts.send("stale quote", f"{pair} age {age:.1f}s")
             return quote
         except (CoinbaseError, Exception) as exc:  # noqa: BLE001
-            self.failed_polls += 1
-            log.warning("quote poll failed: %s", exc)
-            if self.failed_polls >= self.cfg.max_failed_polls:
+            self.failed_polls[pair] = self.failed_polls.get(pair, 0) + 1
+            log.warning("quote poll failed for %s: %s", pair, exc)
+            if self.failed_polls[pair] >= self.cfg.max_failed_polls:
+                self.block_entry_symbols.add(pair)
                 self.block_entries = True
-                self.db.record_event("warning", "stale_quote", f"failed_polls={self.failed_polls}", now_utc())
-                self.alerts.send("quote failures", str(exc))
-            if self.last_quote and (now_utc() - self.last_quote.ts).total_seconds() > self.cfg.stale_quote_sec:
+                self.db.record_event(
+                    "warning", "stale_quote", f"{pair} failed_polls={self.failed_polls[pair]}", now_utc()
+                )
+                self.alerts.send("quote failures", f"{pair}: {exc}")
+            cached = self.last_quotes.get(pair)
+            if cached and (now_utc() - cached.ts).total_seconds() > self.cfg.stale_quote_sec:
+                self.block_entry_symbols.add(pair)
                 self.block_entries = True
-            return self.last_quote
+            return cached
 
     def _manage_position(self, position: Position, quote: Quote, now) -> None:
         fill = quote_exit(quote, position, self.cfg.slippage_bps)
@@ -215,7 +248,7 @@ class Engine:
             self.db.insert_trade(trade)
             self.risk.record_realized(pnl)
             if reason is ExitReason.STOP:
-                self.cooldown_remaining = self.cfg.cooldown_bars
+                self.cooldown_remaining[position.symbol] = self.cfg.cooldown_bars
             if order.status is OrderStatus.PARTIALLY_FILLED:
                 remain = position.qty - qty
                 if is_dust(remain, quote.bid, self.cfg.min_order_size, self.cfg.dust_notional_usd):
@@ -231,20 +264,24 @@ class Engine:
             position.qty = Decimal("0")
             self.db.update_position(position)
 
-    def _maybe_enter(self, quote: Quote, now) -> None:
+    def _maybe_enter(self, quote: Quote, now) -> bool:
+        return self._maybe_enter_symbol(quote.symbol, quote, now)
+
+    def _maybe_enter_symbol(self, symbol: str, quote: Quote, now) -> bool:
         try:
-            bars = self.feed.get_candles(self.cfg.symbol, self.cfg.timeframe_seconds)
+            bars = self.feed.get_candles(symbol, self.cfg.timeframe_seconds)
             htf = None
             if self.cfg.htf_filter_enabled:
-                htf = self.feed.get_candles(self.cfg.symbol, self.cfg.htf_timeframe_seconds)
+                htf = self.feed.get_candles(symbol, self.cfg.htf_timeframe_seconds)
         except Exception as exc:  # noqa: BLE001
-            log.warning("candles failed: %s", exc)
-            return
+            log.warning("candles failed for %s: %s", symbol, exc)
+            return False
         if not bars:
-            return
-        if self.last_bar_ts and bars[-1].ts != self.last_bar_ts and self.cooldown_remaining > 0:
-            self.cooldown_remaining -= 1
-        self.last_bar_ts = bars[-1].ts
+            return False
+        prev_ts = self.last_bar_ts.get(symbol)
+        if prev_ts and bars[-1].ts != prev_ts and self.cooldown_remaining.get(symbol, 0) > 0:
+            self.cooldown_remaining[symbol] = self.cooldown_remaining.get(symbol, 0) - 1
+        self.last_bar_ts[symbol] = bars[-1].ts
         closed = bars[:-1] if len(bars) > 1 else bars
         ind = compute_indicators(
             closed,
@@ -255,34 +292,37 @@ class Engine:
             htf_ema_period=self.cfg.htf_ema_period,
         )
         if ind is None:
-            return
-        signal = evaluate_entry(self.cfg, ind, quote, cooldown_remaining=self.cooldown_remaining)
+            return False
+        signal = evaluate_entry(
+            self.cfg, ind, quote, cooldown_remaining=self.cooldown_remaining.get(symbol, 0)
+        )
         if not signal.enter_long:
             if signal.skip_reason and signal.skip_reason.startswith("spread"):
-                self.db.record_event("info", "spread_skip", signal.skip_reason, now)
-            return
+                self.db.record_event("info", "spread_skip", f"{symbol} {signal.skip_reason}", now)
+            return False
         qty = (D(self.cfg.max_notional_usd) / quote.ask).quantize(Decimal("0.00000001"))
         if qty < self.cfg.min_order_size:
-            return
-        client_id = None
-        order = self.broker.place_order(Side.BUY, self.cfg.symbol, qty, quote)
+            return False
+        if self.db.open_position(symbol) is not None:
+            return False
+        order = self.broker.place_order(Side.BUY, symbol, qty, quote)
         client_id = order.client_order_id
         self.db.upsert_order(order)
         self._persist_paper()
         if order.status is OrderStatus.PENDING:
-            return
+            return False
         if order.filled_qty <= 0 or order.average_price is None:
-            return
+            return False
         entry = order.average_price
         stop, target = position_exits(entry, ind.atr, self.cfg)
         status = PositionStatus.OPEN
         if is_dust(order.filled_qty, entry, self.cfg.min_order_size, self.cfg.dust_notional_usd):
             status = PositionStatus.DUST
-            self.alerts.send("dust fill", str(order.filled_qty))
+            self.alerts.send("dust fill", f"{symbol} {order.filled_qty}")
         self.db.insert_position(
             Position(
                 id=None,
-                symbol=self.cfg.symbol,
+                symbol=symbol,
                 qty=order.filled_qty,
                 entry_price=entry,
                 stop=stop,
@@ -294,6 +334,7 @@ class Engine:
                 client_order_id=client_id,
             )
         )
+        return status is PositionStatus.OPEN
 
 
 def _sleep(seconds: float) -> None:

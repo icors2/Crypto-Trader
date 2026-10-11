@@ -85,10 +85,15 @@ def normalize_asset(asset: str) -> str:
     return ticker
 
 
-def paper_view(account: PaperAccount, quote: Quote | None = None) -> dict[str, Any]:
+def paper_view(account: PaperAccount, quote: Quote | dict[str, Quote] | None = None) -> dict[str, Any]:
     marks: dict[str, Decimal] = {}
-    if quote is not None:
-        marks[normalize_asset(quote.symbol)] = quote.mid
+    quotes: list[Quote] = []
+    if isinstance(quote, dict):
+        quotes = list(quote.values())
+    elif quote is not None:
+        quotes = [quote]
+    for item in quotes:
+        marks[normalize_asset(item.symbol)] = item.mid
     return {
         "name": account.name,
         "cash": account.cash,

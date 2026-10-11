@@ -4,7 +4,7 @@ import base64
 import json
 import time
 from typing import Any
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 import httpx
 from nacl.signing import SigningKey
@@ -107,6 +107,29 @@ class RobinhoodClient:
 
     def get_accounts(self) -> Any:
         return self.request("GET", "/api/v2/crypto/trading/accounts/")
+
+    def get_trading_pairs(self, *symbols: str) -> list[dict[str, Any]]:
+        if symbols:
+            query = "&".join(f"symbol={item.upper()}" for item in symbols)
+            path = f"/api/v2/crypto/trading/trading_pairs/?{query}"
+        else:
+            path = "/api/v2/crypto/trading/trading_pairs/"
+        rows: list[dict[str, Any]] = []
+        while path:
+            data = self.request("GET", path)
+            if isinstance(data, list):
+                rows.extend(data)
+                break
+            rows.extend(data.get("results") or [])
+            nxt = data.get("next")
+            if not nxt:
+                break
+            if str(nxt).startswith("http"):
+                parsed = urlparse(str(nxt))
+                path = parsed.path + (f"?{parsed.query}" if parsed.query else "")
+            else:
+                path = str(nxt)
+        return rows
 
     def get_holdings(self, account_number: str | None = None, *asset_codes: str) -> Any:
         acct = account_number or self.account_number
