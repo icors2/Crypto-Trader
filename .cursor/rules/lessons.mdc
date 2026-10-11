@@ -7,6 +7,12 @@ alwaysApply: false
 
 Write the mistake, the signal, and the fix. Newest first.
 
+## 2026-10-11 — Docker first `uv sync` needs `--no-install-project`
+
+- **What happened:** `docker compose up --build` failed on `COPY pyproject.toml uv.lock` then `uv sync --frozen --no-dev`. setuptools looks for `src/` (`egg_base`) and `README.md`. The VM kept patching the Dockerfile; `git pull` of `main` overwrote it.
+- **Signal:** `error in 'egg_base' option: 'src' does not exist or is not a directory`
+- **Fix:** First stage `uv sync --frozen --no-dev --no-install-project`, then `COPY . .`, then `uv sync --frozen --no-dev --no-editable`. Do not re-apply this only on the server.
+
 ## 2026-10-11 — Quiet session, zero fills
 
 - **What happened:** Loop healthy all day, blotter empty.
