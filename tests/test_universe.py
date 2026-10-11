@@ -49,10 +49,11 @@ def test_robinhood_rows_filter_non_usd_and_untradable():
     assert [p.symbol for p in pairs] == ["ETH-USD"]
 
 
-def test_resolve_universe_intersects_coinbase():
+def test_resolve_universe_keeps_robinhood_pairs_not_on_coinbase():
     rows = [
         {"symbol": "WIF-USD", "asset_code": "WIF", "quote_code": "USD", "status": "tradable", "is_api_tradable": True},
-        {"symbol": "NOPE-USD", "asset_code": "NOPE", "quote_code": "USD", "status": "tradable", "is_api_tradable": True},
+        {"symbol": "HYPE-USD", "asset_code": "HYPE", "quote_code": "USD", "status": "tradable", "is_api_tradable": True},
+        {"symbol": "USDC-USD", "asset_code": "USDC", "quote_code": "USD", "status": "tradable", "is_api_tradable": True},
     ]
-    pairs = resolve_universe(robinhood_rows=rows, coinbase_ids={"WIF-USD", "BTC-USD"})
-    assert [p.symbol for p in pairs] == ["WIF-USD"]
+    pairs = resolve_universe(robinhood_rows=rows)
+    assert [p.symbol for p in pairs] == ["WIF-USD", "HYPE-USD"]

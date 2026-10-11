@@ -21,7 +21,7 @@ Agents update this file. It is the living snapshot of the project.
 
 ## Current focus
 
-- Watchlist can include any Robinhood USD crypto (not BTC-only). Indicators still require a Coinbase product.
+- Watchlist is Robinhood-tradable USD pairs only (not Coinbase’s catalog). Coinbase candles are for signals when available.
 
 ## Open questions
 

@@ -91,18 +91,13 @@ class Runtime:
 
     def refresh_universe(self) -> None:
         robinhood_rows = None
-        coinbase_ids = None
-        try:
-            coinbase_ids = self.feed.list_usd_product_ids()
-        except Exception:  # noqa: BLE001
-            coinbase_ids = None
         client = getattr(self.broker, "client", None)
         if client is not None and hasattr(client, "get_trading_pairs"):
             try:
                 robinhood_rows = client.get_trading_pairs()
             except Exception:  # noqa: BLE001
                 robinhood_rows = None
-        self.universe = resolve_universe(robinhood_rows=robinhood_rows, coinbase_ids=coinbase_ids)
+        self.universe = resolve_universe(robinhood_rows=robinhood_rows)
         if not self.universe:
             self.universe = catalog_pairs()
 

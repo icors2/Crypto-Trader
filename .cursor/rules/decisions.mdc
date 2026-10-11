@@ -9,10 +9,10 @@ Record choices that later agents should not silently reverse. Newest first.
 
 ## 2026-10-11 — Any Robinhood USD coin
 
-- **Decision:** The bot trades a watchlist of Robinhood USD pairs (`symbols` + `max_open_positions`), not a single hardcoded BTC market. Paper uses a catalog of RH pairs; live can refresh `GET /api/v2/crypto/trading/trading_pairs/` and keep `is_api_tradable` + `status=tradable`. Coinbase OHLC is still required, so the UI universe is intersected with Coinbase USD products when that list is reachable.
-- **Why:** Operator asked to trade any Robinhood coin. Indicators must stay on Coinbase candles (plan review).
-- **Alternatives rejected:** BTC-only; trading pairs with no Coinbase candles; unofficial RH asset scrapes.
-- **Revisit when:** Robinhood adds a quote currency other than USD, or Coinbase delists a pair that RH still trades.
+- **Decision:** The selectable universe is **Robinhood-tradable USD pairs only** (`is_api_tradable` + `status=tradable` from `GET /api/v2/crypto/trading/trading_pairs/`, or the built-in RH catalog in paper). Coinbase is not used to hide coins. Coinbase OHLC is still used for EMA/ATR when that product exists; if Coinbase has no market, that symbol is skipped for entries, not removed from the list.
+- **Why:** Live orders can only fill on Robinhood. Coinbase lists many pairs RH cannot trade, and RH lists coins Coinbase does not.
+- **Alternatives rejected:** BTC-only; intersecting the UI list with Coinbase products; unofficial RH scrapes as the live source of truth.
+- **Revisit when:** Robinhood adds a non-USD quote, or v2 stops returning the full pair list.
 
 ## 2026-10-11 — Paper account is a full ledger
 

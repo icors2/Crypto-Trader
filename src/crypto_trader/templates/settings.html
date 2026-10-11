@@ -116,7 +116,7 @@
   <h2>Admin · settings</h2>
   <p class="note">Hard ceilings from the environment: notional ≤ {{ env.max_notional_usd }}, daily ≤ {{ env.max_daily_loss_usd }}, weekly ≤ {{ env.max_weekly_loss_usd }}, cumulative ≤ {{ env.max_cumulative_loss_usd }}, poll ≥ {{ env.min_poll_interval_sec }}s, open positions ≤ {{ env.max_open_positions }}.</p>
   <form method="post" action="/universe/refresh" class="row">
-    <button type="submit">Refresh Robinhood / Coinbase coin list</button>
+    <button type="submit">Refresh Robinhood tradable pairs</button>
   </form>
   <form class="admin" method="post" action="/settings">
     <fieldset>
@@ -147,7 +147,7 @@
 
     <fieldset>
       <legend>Robinhood coins</legend>
-      <p class="note">Select any USD pair Robinhood lists. Indicators still come from Coinbase OHLC, so a pair needs a Coinbase product. Paper uses the built-in catalog; live can refresh the official trading-pairs list.</p>
+      <p class="note">This list is what Robinhood can trade (USD pairs). It is not Coinbase’s catalog — live orders only work for Robinhood <code>is_api_tradable</code> pairs. Paper uses the built-in Robinhood list; with API keys, Refresh loads the official v2 trading-pairs endpoint. Coinbase candles are used only for EMA/ATR when that product exists; a missing Coinbase market skips the signal, it does not hide the coin.</p>
       <div class="coin-grid">
         {% for pair in universe %}
           <label class="coin">

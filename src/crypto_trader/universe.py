@@ -4,62 +4,97 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
-# Robinhood Crypto USD pairs that typically also have Coinbase Exchange candles.
-# Live mode refreshes from GET /api/v2/crypto/trading/trading_pairs/.
-# Paper mode uses this catalog (intersected with Coinbase products when reachable).
+# Robinhood Crypto USD pairs (US app availability, Oct 2026).
+# Source of truth when keyed: GET /api/v2/crypto/trading/trading_pairs/
+# (is_api_tradable + status=tradable). Coinbase is never used to hide a pair.
+_STABLE = {"USD", "USDC", "USDG"}
+
 ROBINHOOD_USD_PAIRS: tuple[str, ...] = (
     "AAVE-USD",
     "ADA-USD",
+    "AERO-USD",
     "ALGO-USD",
-    "APT-USD",
     "ARB-USD",
+    "ASTER-USD",
     "ATOM-USD",
     "AVAX-USD",
+    "AVNT-USD",
     "AXS-USD",
+    "BAT-USD",
     "BCH-USD",
+    "BILL-USD",
+    "BIO-USD",
+    "BNB-USD",
     "BONK-USD",
     "BTC-USD",
+    "CC-USD",
     "COMP-USD",
     "CRV-USD",
     "DOGE-USD",
     "DOT-USD",
-    "ENS-USD",
+    "EIGEN-USD",
+    "ENA-USD",
     "ETC-USD",
     "ETH-USD",
     "FET-USD",
-    "FIL-USD",
     "FLOKI-USD",
+    "FLR-USD",
+    "GRAM-USD",
     "GRT-USD",
     "HBAR-USD",
+    "HYPE-USD",
     "IMX-USD",
     "INJ-USD",
-    "JUP-USD",
+    "JTO-USD",
     "LDO-USD",
     "LINK-USD",
+    "LIT-USD",
     "LTC-USD",
-    "MANA-USD",
-    "MKR-USD",
+    "MEGA-USD",
+    "MEW-USD",
+    "MNT-USD",
+    "MON-USD",
+    "MOODENG-USD",
+    "MORPHO-USD",
     "NEAR-USD",
     "ONDO-USD",
     "OP-USD",
+    "ORCA-USD",
+    "PAXG-USD",
+    "PENGU-USD",
     "PEPE-USD",
+    "PNUT-USD",
     "POL-USD",
+    "POPCAT-USD",
     "PYTH-USD",
     "QNT-USD",
+    "RAY-USD",
     "RENDER-USD",
-    "SAND-USD",
     "SEI-USD",
     "SHIB-USD",
+    "SKY-USD",
+    "SNX-USD",
     "SOL-USD",
-    "STX-USD",
+    "STRK-USD",
     "SUI-USD",
-    "TIA-USD",
+    "SYRUP-USD",
+    "TRUMP-USD",
     "UNI-USD",
-    "VET-USD",
+    "VIRTUAL-USD",
+    "VVV-USD",
     "WIF-USD",
+    "WLD-USD",
+    "WLFI-USD",
+    "XCN-USD",
+    "XDC-USD",
     "XLM-USD",
+    "XPL-USD",
     "XRP-USD",
     "XTZ-USD",
+    "ZEC-USD",
+    "ZORA-USD",
+    "ZRO-USD",
+    "ZRX-USD",
 )
 
 
@@ -70,7 +105,7 @@ class TradingPair:
     quote_code: str = "USD"
     min_order_amount: str | None = None
     is_api_tradable: bool = True
-    source: str = "catalog"
+    source: str = "robinhood"
 
 
 def normalize_symbol(raw: str) -> str:
@@ -107,7 +142,7 @@ def parse_symbols(value: Any) -> list[str]:
 
 def catalog_pairs() -> list[TradingPair]:
     return [
-        TradingPair(symbol=symbol, asset_code=symbol.split("-")[0], source="catalog")
+        TradingPair(symbol=symbol, asset_code=symbol.split("-")[0], source="robinhood")
         for symbol in ROBINHOOD_USD_PAIRS
     ]
 
@@ -128,13 +163,16 @@ def pairs_from_robinhood(rows: list[dict[str, Any]]) -> list[TradingPair]:
             symbol = normalize_symbol(str(row.get("symbol") or ""))
         except ValueError:
             continue
+        asset = str(row.get("asset_code") or symbol.split("-")[0]).upper()
+        if asset in _STABLE:
+            continue
         if symbol in seen:
             continue
         seen.add(symbol)
         out.append(
             TradingPair(
                 symbol=symbol,
-                asset_code=str(row.get("asset_code") or symbol.split("-")[0]).upper(),
+                asset_code=asset,
                 quote_code=quote,
                 min_order_amount=str(row.get("min_order_amount")) if row.get("min_order_amount") else None,
                 is_api_tradable=True,
@@ -144,16 +182,10 @@ def pairs_from_robinhood(rows: list[dict[str, Any]]) -> list[TradingPair]:
     return out
 
 
-def intersect_coinbase(pairs: list[TradingPair], coinbase_ids: set[str] | None) -> list[TradingPair]:
-    if not coinbase_ids:
-        return pairs
-    return [pair for pair in pairs if pair.symbol in coinbase_ids]
-
-
-def resolve_universe(
-    *,
-    robinhood_rows: list[dict[str, Any]] | None = None,
-    coinbase_ids: set[str] | None = None,
-) -> list[TradingPair]:
-    pairs = pairs_from_robinhood(robinhood_rows) if robinhood_rows else catalog_pairs()
-    return intersect_coinbase(pairs, coinbase_ids)
+def resolve_universe(*, robinhood_rows: list[dict[str, Any]] | None = None) -> list[TradingPair]:
+    """Robinhood-tradable USD pairs only. Coinbase does not filter this list."""
+    if robinhood_rows:
+        pairs = pairs_from_robinhood(robinhood_rows)
+        if pairs:
+            return pairs
+    return catalog_pairs()

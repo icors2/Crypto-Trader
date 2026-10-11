@@ -91,7 +91,9 @@ def test_dashboard_and_admin_and_trades(env_settings):
     assert b"Robinhood coins" in admin.content
     assert b"ETH-USD" in admin.content
     assert b"SOL-USD" in admin.content
+    assert b"HYPE-USD" in admin.content
     assert b"Watchlist" in dash.content
+    assert b"what Robinhood can trade" in admin.content
 
 
 def test_admin_saves_stop_and_resets_risk(env_settings):

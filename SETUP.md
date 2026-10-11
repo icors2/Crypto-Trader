@@ -183,7 +183,7 @@ grep -E '^(mode|symbol|timezone|paper_starting_cash):' config/config.yaml
 Expected:
 
 - `mode: paper`
-- `symbol: BTC-USD` and optional `symbols:` watchlist of any Robinhood USD pairs that Coinbase also lists
+- `symbol: BTC-USD` and optional `symbols:` watchlist of Robinhood-tradable USD pairs (refresh from the v2 trading-pairs API when keyed)
 - `timezone: America/Chicago`
 - `paper_starting_cash` present
 
