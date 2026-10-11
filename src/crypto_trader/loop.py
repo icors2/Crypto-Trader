@@ -27,9 +27,14 @@ from crypto_trader.money import D, money
 from crypto_trader.paper import PaperBroker
 from crypto_trader.reconcile import is_dust, paper_lookup, reconcile_pending
 from crypto_trader.risk import RiskEngine
+from crypto_trader.risk_adjust import RiskAdjustSnapshot, apply_risk_level, skip_prefix
 from crypto_trader.settings import EnvSettings
 from crypto_trader.strategy import evaluate_entry, position_exits
 from crypto_trader.timeutil import is_session_open, now_utc
+
+_LOG_SKIP_PREFIXES = frozenset(
+    {"cost_unaware", "spread", "cooldown", "htf_unavailable", "htf_downtrend", "no_candles"}
+)
 
 log = logging.getLogger(__name__)
 
@@ -67,6 +72,12 @@ class Engine:
         self.block_entries = False
         self.block_entry_symbols: set[str] = set()
         self.config_mtime: float | None = None
+        self.effective_cfg = cfg
+        self.risk_adjust: RiskAdjustSnapshot | None = None
+        self.last_skips: dict[str, str] = {}
+        self.skip_counts: dict[str, int] = {}
+        self.last_entry_at = None
+        self.session_opened_at = None
 
     def run_forever(self) -> None:
         self.alerts.send("trader restart", "trading loop starting")
@@ -144,8 +155,11 @@ class Engine:
             self.last_quote = next(iter(quotes.values()))
         halt = self.risk.check(now, positions, quotes, stop_file=stop_file, session_open=session)
         paused = halt is not HaltReason.NONE
+        self._refresh_risk_adjust(now, session)
         self.health.touch(paused=paused, reason=halt.value if paused else "ok")
         if not quotes and not positions:
+            if paused:
+                self._note_skip("_book", halt.value, now)
             return
         for position in positions:
             quote = quotes.get(position.symbol)
@@ -153,10 +167,12 @@ class Engine:
                 continue
             self._manage_position(position, quote, now)
         if paused or self.block_entries:
+            self._note_skip("_book", halt.value if paused else "stale_quote", now)
             return
         open_now = {pos.symbol for pos in self.db.open_positions()}
         slots = self.cfg.max_open_positions - len(open_now)
         if slots <= 0:
+            self._note_skip("_book", "max_positions", now)
             return
         for symbol in watchlist:
             if slots <= 0:
@@ -248,7 +264,7 @@ class Engine:
             self.db.insert_trade(trade)
             self.risk.record_realized(pnl)
             if reason is ExitReason.STOP:
-                self.cooldown_remaining[position.symbol] = self.cfg.cooldown_bars
+                self.cooldown_remaining[position.symbol] = self.effective_cfg.cooldown_bars
             if order.status is OrderStatus.PARTIALLY_FILLED:
                 remain = position.qty - qty
                 if is_dust(remain, quote.bid, self.cfg.min_order_size, self.cfg.dust_notional_usd):
@@ -275,8 +291,10 @@ class Engine:
                 htf = self.feed.get_candles(symbol, self.cfg.htf_timeframe_seconds)
         except Exception as exc:  # noqa: BLE001
             log.warning("candles failed for %s: %s", symbol, exc)
+            self._note_skip(symbol, "no_candles", now)
             return False
         if not bars:
+            self._note_skip(symbol, "no_candles", now)
             return False
         prev_ts = self.last_bar_ts.get(symbol)
         if prev_ts and bars[-1].ts != prev_ts and self.cooldown_remaining.get(symbol, 0) > 0:
@@ -292,16 +310,17 @@ class Engine:
             htf_ema_period=self.cfg.htf_ema_period,
         )
         if ind is None:
+            self._note_skip(symbol, "no_indicators", now)
             return False
         signal = evaluate_entry(
-            self.cfg, ind, quote, cooldown_remaining=self.cooldown_remaining.get(symbol, 0)
+            self.effective_cfg, ind, quote, cooldown_remaining=self.cooldown_remaining.get(symbol, 0)
         )
         if not signal.enter_long:
-            if signal.skip_reason and signal.skip_reason.startswith("spread"):
-                self.db.record_event("info", "spread_skip", f"{symbol} {signal.skip_reason}", now)
+            self._note_skip(symbol, signal.skip_reason or "skipped", now)
             return False
-        qty = (D(self.cfg.max_notional_usd) / quote.ask).quantize(Decimal("0.00000001"))
+        qty = (D(self.effective_cfg.max_notional_usd) / quote.ask).quantize(Decimal("0.00000001"))
         if qty < self.cfg.min_order_size:
+            self._note_skip(symbol, "qty_too_small", now)
             return False
         if self.db.open_position(symbol) is not None:
             return False
@@ -334,7 +353,40 @@ class Engine:
                 client_order_id=client_id,
             )
         )
+        if status is PositionStatus.OPEN:
+            self.last_entry_at = now
         return status is PositionStatus.OPEN
+
+    def _refresh_risk_adjust(self, now, session: bool) -> None:
+        if session:
+            if self.session_opened_at is None:
+                self.session_opened_at = now
+        else:
+            self.session_opened_at = None
+        self.effective_cfg, self.risk_adjust = apply_risk_level(
+            self.cfg,
+            now=now,
+            last_entry_at=self.last_entry_at,
+            session_opened_at=self.session_opened_at,
+            session_open=session,
+            daily_pnl=self.risk.state.daily_pnl,
+        )
+
+    def _note_skip(self, symbol: str, reason: str, now) -> None:
+        prev = self.last_skips.get(symbol)
+        self.last_skips[symbol] = reason
+        key = skip_prefix(reason)
+        self.skip_counts[key] = self.skip_counts.get(key, 0) + 1
+        if prev != reason and key in _LOG_SKIP_PREFIXES:
+            self.db.record_event("info", "entry_skip", f"{symbol} {reason}", now)
+
+    def skip_board(self) -> dict[str, object]:
+        counts = dict(sorted(self.skip_counts.items(), key=lambda item: (-item[1], item[0])))
+        return {
+            "counts": counts,
+            "last": dict(self.last_skips),
+            "total": sum(self.skip_counts.values()),
+        }
 
 
 def _sleep(seconds: float) -> None:

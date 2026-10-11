@@ -383,6 +383,7 @@ Re-run the `/healthz` gate. Config and DB stay on the bind mounts.
 | Weekly halt after reboot | Counters persist in memory? weekly halt is in-process | Resume in Admin; restart does not mean “resume” |
 | Paper cash reset on restart | Old image without ledger persist | Pull this branch; cash lives in SQLite |
 | Accidental live | `mode: live` without keys | Process refuses to boot without `ROBINHOOD_*`; keep paper |
+| Ran all day, zero fills | `cost_unaware` at `fee_bps: 100` on 5m ATR | Dashboard **Why no trades**; leave `risk_level: auto` or pick Aggressive. Do not flip live. |
 
 ---
 

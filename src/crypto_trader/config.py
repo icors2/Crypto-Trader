@@ -45,7 +45,11 @@ YAML_FIELDS = (
     "session_end",
     "paper_starting_cash",
     "flatten_on_session_end",
+    "risk_level",
+    "auto_loosen_after_min",
 )
+
+RISK_LEVELS = frozenset({"manual", "conservative", "balanced", "aggressive", "auto"})
 
 
 @dataclass
@@ -83,6 +87,8 @@ class BotConfig:
     session_end: str = "20:00"
     paper_starting_cash: Decimal = Decimal("10000")
     flatten_on_session_end: bool = True
+    risk_level: str = "auto"
+    auto_loosen_after_min: int = 60
 
     def watchlist(self) -> list[str]:
         selected = parse_symbols(self.symbols) if self.symbols else []
@@ -178,6 +184,10 @@ def validate_config(cfg: BotConfig, env: EnvSettings) -> BotConfig:
         errors.append(str(exc))
     if cfg.max_open_positions < 1:
         errors.append("max_open_positions must be >= 1")
+    if cfg.risk_level not in RISK_LEVELS:
+        errors.append("risk_level must be manual, conservative, balanced, aggressive, or auto")
+    if cfg.auto_loosen_after_min < 5 or cfg.auto_loosen_after_min > 1440:
+        errors.append("auto_loosen_after_min must be 5–1440")
     try:
         from crypto_trader.timeutil import parse_hhmm, zone
 

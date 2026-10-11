@@ -185,6 +185,32 @@
     </fieldset>
 
     <fieldset>
+      <legend>Risk level</legend>
+      <p class="note">
+        Auto starts at balanced, loosens toward aggressive after {{ cfg.auto_loosen_after_min }} minutes
+        with no entries, and tightens to conservative if daily loss reaches 40% of the daily cap.
+        Manual uses the YAML cost multiple / spread / cooldown / notional as written.
+        Env hard ceilings still apply — this only scales risk <em>down</em> or loosens the 5m cost gate.
+      </p>
+      {% if risk_adjust %}
+        <p class="note">Effective now: <strong>{{ risk_adjust.effective_level }}</strong> · {{ risk_adjust.note }}</p>
+      {% endif %}
+      <div class="settings">
+        <div>
+          <label for="risk_level">Risk level</label>
+          <select id="risk_level" name="risk_level">
+            <option value="auto" {% if cfg.risk_level == "auto" %}selected{% endif %}>auto</option>
+            <option value="conservative" {% if cfg.risk_level == "conservative" %}selected{% endif %}>conservative</option>
+            <option value="balanced" {% if cfg.risk_level == "balanced" %}selected{% endif %}>balanced</option>
+            <option value="aggressive" {% if cfg.risk_level == "aggressive" %}selected{% endif %}>aggressive</option>
+            <option value="manual" {% if cfg.risk_level == "manual" %}selected{% endif %}>manual</option>
+          </select>
+        </div>
+        <div><label for="auto_loosen_after_min">Auto loosen after (min)</label><input id="auto_loosen_after_min" name="auto_loosen_after_min" type="number" min="5" max="1440" value="{{ cfg.auto_loosen_after_min }}"></div>
+      </div>
+    </fieldset>
+
+    <fieldset>
       <legend>Risk limits</legend>
       <div class="settings">
         <div><label for="max_notional_usd">Max notional (USD)</label><input id="max_notional_usd" name="max_notional_usd" value="{{ cfg.max_notional_usd }}"></div>

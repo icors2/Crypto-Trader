@@ -28,6 +28,10 @@
     <p>Daily PnL <span class="stat">{{ risk.daily_pnl }}</span></p>
     <p class="note">Weekly {{ risk.weekly_pnl }} · cumulative {{ risk.cumulative_pnl }}</p>
     <p class="note">Manual resume required: {{ risk.manual_resume_required }} · halt {{ risk.halt_reason }}</p>
+    {% if risk_adjust %}
+      <p class="note">Risk level {{ risk_adjust.configured_level }} → <strong>{{ risk_adjust.effective_level }}</strong>
+        · cost ×{{ risk_adjust.cost_multiple }} · notional {{ risk_adjust.max_notional_usd }}</p>
+    {% endif %}
   </article>
   <article class="card">
     <h2>Quotes</h2>
@@ -54,6 +58,52 @@
       <p class="note">Flat</p>
     {% endif %}
   </article>
+</section>
+
+<section class="card" style="margin-top:1rem">
+  <h2>Why no trades</h2>
+  {% if risk_adjust %}
+    <p>
+      <span class="pill {{ 'ok' if risk_adjust.effective_level == 'aggressive' else 'warn' if risk_adjust.effective_level != 'conservative' else 'bad' }}">
+        {{ risk_adjust.effective_level }}
+      </span>
+      configured {{ risk_adjust.configured_level }}
+    </p>
+    <p class="note">{{ risk_adjust.note }}</p>
+    <p class="note">
+      Effective cost multiple {{ risk_adjust.cost_multiple }} · max spread {{ risk_adjust.spread_max_bps }} bps
+      · notional {{ risk_adjust.max_notional_usd }} · cooldown {{ risk_adjust.cooldown_bars }} bars
+      · idle {{ '%.0f'|format(risk_adjust.idle_minutes) }} min
+    </p>
+  {% else %}
+    <p class="note">Waiting for the first trading-loop tick to compute the effective risk level.</p>
+  {% endif %}
+  <p class="note">
+    A full day with zero fills is usually the cost gate, not a missing risk slider.
+    Entries need a bullish 9/21 EMA cross, then target (ATR × {{ cfg.target_atr_mult }}) must beat
+    round-trip cost × cost multiple. With <code>fee_bps={{ cfg.fee_bps }}</code>, 5m ATR is typically
+    far smaller than 2% of price, so <code>cost_unaware</code> wins until Auto loosens the gate
+    (or you pick Aggressive / Manual and lower <code>cost_multiple</code>).
+  </p>
+  {% if skip_board and skip_board.total %}
+    <div class="grid">
+      {% for reason, count in skip_board.counts.items() %}
+        <div>{{ reason }} <div class="stat">{{ count }}</div></div>
+      {% endfor %}
+    </div>
+    {% if skip_board.last %}
+      <table>
+        <thead><tr><th>Symbol</th><th>Last skip</th></tr></thead>
+        <tbody>
+        {% for symbol, reason in skip_board.last.items() %}
+          <tr><td>{{ symbol }}</td><td>{{ reason }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+  {% else %}
+    <p class="note">No entry evaluations recorded yet this process. After a session they show up here even when the blotter stays empty.</p>
+  {% endif %}
 </section>
 
 <section class="card" style="margin-top:1rem">

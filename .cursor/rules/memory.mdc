@@ -22,6 +22,7 @@ Agents update this file. It is the living snapshot of the project.
 ## Current focus
 
 - Watchlist is Robinhood-tradable USD pairs only (not Coinbase’s catalog). Coinbase candles are for signals when available.
+- Zero fills on a quiet day are usually `cost_unaware` at `fee_bps: 100`. `risk_level` (`manual|conservative|balanced|aggressive|auto`) overlays cost/spread/notional/cooldown; env ceilings still apply.
 
 ## Open questions
 

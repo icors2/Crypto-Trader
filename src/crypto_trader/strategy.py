@@ -27,8 +27,9 @@ def evaluate_entry(
         return Signal(False, f"spread:{spr:.2f}")
     target_distance = ind.atr * D(cfg.target_atr_mult)
     rtc = round_trip_cost_per_unit(quote.mid, quote.spread, cfg.fee_bps)
-    if target_distance <= rtc * D(cfg.cost_multiple):
-        return Signal(False, "cost_unaware")
+    need = rtc * D(cfg.cost_multiple)
+    if target_distance <= need:
+        return Signal(False, f"cost_unaware: target {target_distance} < need {need}")
     if cfg.htf_filter_enabled:
         if ind.htf_ema is None or ind.htf_close is None:
             return Signal(False, "htf_unavailable")

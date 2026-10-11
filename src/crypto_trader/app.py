@@ -88,6 +88,7 @@ class Runtime:
         self.start_loop = start_loop
         self.thread: threading.Thread | None = None
         self.universe = catalog_pairs()
+        self.engine._refresh_risk_adjust(now_utc(), True)
 
     def refresh_universe(self) -> None:
         robinhood_rows = None
@@ -230,6 +231,8 @@ def create_app(runtime: Runtime | None = None, start_loop: bool = True) -> FastA
                 "notice": _notice(request),
                 "events": rt.db.recent_events(8),
                 "paper": rt.paper_snapshot(),
+                "risk_adjust": rt.engine.risk_adjust,
+                "skip_board": rt.engine.skip_board(),
             },
         )
 
@@ -266,6 +269,7 @@ def create_app(runtime: Runtime | None = None, start_loop: bool = True) -> FastA
                 "universe": rt.universe,
                 "audits": rt.db.list_config_audit(15),
                 "paper": rt.paper_snapshot(),
+                "risk_adjust": rt.engine.risk_adjust,
             },
         )
 
@@ -293,6 +297,7 @@ def create_app(runtime: Runtime | None = None, start_loop: bool = True) -> FastA
             "stale_quote_sec",
             "max_failed_polls",
             "max_open_positions",
+            "auto_loosen_after_min",
         }
         dec_fields = {
             "max_notional_usd",
@@ -311,6 +316,7 @@ def create_app(runtime: Runtime | None = None, start_loop: bool = True) -> FastA
             "timezone",
             "session_start",
             "session_end",
+            "risk_level",
             *int_fields,
             *dec_fields,
             *float_fields,
@@ -343,6 +349,7 @@ def create_app(runtime: Runtime | None = None, start_loop: bool = True) -> FastA
             return settings_form(request, error=str(exc))
         rt.engine.cfg = rt.cfg
         rt.risk.cfg = rt.cfg
+        rt.engine._refresh_risk_adjust(now_utc(), True)
         rt.broker.fee_bps = rt.cfg.fee_bps
         rt.broker.slippage_bps = rt.cfg.slippage_bps
         if isinstance(rt.broker, PaperBroker):
@@ -413,6 +420,8 @@ def create_app(runtime: Runtime | None = None, start_loop: bool = True) -> FastA
         rt.engine.cooldown_remaining = {}
         rt.engine.block_entries = False
         rt.engine.block_entry_symbols.clear()
+        rt.engine.skip_counts.clear()
+        rt.engine.last_skips.clear()
         rt.db.record_event("info", "reset_risk", "operator reset risk counters", now_utc())
         return RedirectResponse("/settings?notice=risk_reset", status_code=303)
 
@@ -539,6 +548,8 @@ def create_app(runtime: Runtime | None = None, start_loop: bool = True) -> FastA
             rt.engine.cooldown_remaining = {}
             rt.engine.block_entries = False
             rt.engine.block_entry_symbols.clear()
+            rt.engine.skip_counts.clear()
+            rt.engine.last_skips.clear()
         rt.db.record_event(
             "info",
             "paper_reset",

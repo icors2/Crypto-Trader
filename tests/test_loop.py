@@ -91,3 +91,20 @@ def test_config_hot_reload_keeps_stored_exits(env_settings):
     assert loaded.stop == Decimal("95")
     assert loaded.target == Decimal("110")
     assert pos.stop == loaded.stop
+
+
+def test_tick_records_entry_skip_when_candles_missing(env_settings):
+    quote = Quote(
+        ts=datetime.now(tz=UTC),
+        symbol="BTC-USD",
+        bid=Decimal("100"),
+        ask=Decimal("100.1"),
+        source="test",
+    )
+    engine = _engine(env_settings, quote)
+    engine.cfg.session_start = "00:00"
+    engine.cfg.session_end = "23:59"
+    engine.tick()
+    assert engine.skip_counts.get("no_candles", 0) >= 1
+    assert engine.last_skips.get("BTC-USD") == "no_candles"
+    assert engine.risk_adjust is not None

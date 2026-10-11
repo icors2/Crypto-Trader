@@ -43,4 +43,6 @@ def test_cost_filter_skips_when_target_too_small():
     )
     signal = evaluate_entry(cfg, _ind(), quote)
     assert signal.enter_long is False
-    assert signal.skip_reason == "cost_unaware"
+    assert signal.skip_reason and signal.skip_reason.startswith("cost_unaware")
+    assert "target" in signal.skip_reason
+    assert "need" in signal.skip_reason

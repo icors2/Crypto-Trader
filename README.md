@@ -20,6 +20,12 @@ Bot-managed stops only work while the process, VM, and network are up. At $100 n
 
 US round trips are taxable disposals. The trade CSV includes fees and cost basis so you can reconcile against Robinhood year-end forms. This is not tax advice.
 
+## Why the blotter can stay empty
+
+A quiet day is usually the **cost gate**, not a hung loop. Entries need a bullish 9/21 EMA cross, then `ATR × target_atr_mult` must beat round-trip cost × `cost_multiple`. With default `fee_bps: 100`, 5m ATR is typically far smaller than 2% of price, so almost every cross is skipped as `cost_unaware`.
+
+`risk_level: auto` (default) starts at **balanced**, loosens toward **aggressive** after `auto_loosen_after_min` minutes with no entries, and tightens to **conservative** if daily loss reaches 40% of the daily cap. Env hard ceilings still apply. The dashboard **Why no trades** card shows the effective knobs and skip counts.
+
 ## Run
 
 **New machine or test VM:** follow [SETUP.md](SETUP.md) (written so another AI agent can execute it). Keep `mode: paper`.

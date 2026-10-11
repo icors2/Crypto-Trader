@@ -7,6 +7,13 @@ alwaysApply: false
 
 Record choices that later agents should not silently reverse. Newest first.
 
+## 2026-10-11 — Risk level adjustor
+
+- **Decision:** `risk_level` is `manual|conservative|balanced|aggressive|auto` (default `auto`). Named profiles overlay effective `cost_multiple`, `spread_max_bps`, notional scale (≤ configured), and `cooldown_bars`. Auto starts balanced, loosens to aggressive after `auto_loosen_after_min` with no entries, and tightens to conservative if daily PnL ≤ 40% of the daily cap. Env hard ceilings still apply. Dashboard shows skip counts and richer `cost_unaware: target < need` reasons.
+- **Why:** `fee_bps: 100` × `cost_multiple: 2.0` makes 5m ATR almost never clear the cost gate, so a healthy loop can run a full session with zero fills. Operators need an automatic loosen/tighten, not a silent hang.
+- **Alternatives rejected:** Lowering default `fee_bps` (understates paper costs); raising env ceilings from the UI; flipping live to “make it trade.”
+- **Revisit when:** `fee_bps` is calibrated from real `fee_charged`.
+
 ## 2026-10-11 — Any Robinhood USD coin
 
 - **Decision:** The selectable universe is **Robinhood-tradable USD pairs only** (`is_api_tradable` + `status=tradable` from `GET /api/v2/crypto/trading/trading_pairs/`, or the built-in RH catalog in paper). Coinbase is not used to hide coins. Coinbase OHLC is still used for EMA/ATR when that product exists; if Coinbase has no market, that symbol is skipped for entries, not removed from the list.

@@ -7,6 +7,12 @@ alwaysApply: false
 
 Write the mistake, the signal, and the fix. Newest first.
 
+## 2026-10-11 — Quiet session, zero fills
+
+- **What happened:** Loop healthy all day, blotter empty.
+- **Signal:** `cost_unaware` (and often `no_cross`). 5m ATR × target multiple cannot beat `fee_bps=100` round-trip × `cost_multiple=2.0`. Spread skips were the only logged reason.
+- **Fix:** Risk-level overlay + dashboard skip board. Log `entry_skip` when the reason changes. Do not treat “no trades” as a dead thread if `/healthz` is ok.
+
 ## 2026-10-11 — Plan review (do not regress)
 
 - **Fee_bps 0 because "spread is in the quote."** Signal: paper PnL too good. Fix: v2 bid/ask exclude the fee; default `fee_bps` to the real tier and log `fee_charged`.

@@ -28,3 +28,11 @@ def test_yaml_roundtrip_keeps_comment_file(env_settings):
     assert "calibrate" in text
     loaded = load_config(path, env_settings)
     assert loaded.fee_bps == 85
+    assert loaded.risk_level == "auto"
+    assert loaded.auto_loosen_after_min == 60
+
+
+def test_invalid_risk_level_rejected(env_settings):
+    cfg = BotConfig(risk_level="yolo")
+    with pytest.raises(ConfigError):
+        validate_config(cfg, env_settings)

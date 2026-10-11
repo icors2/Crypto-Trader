@@ -36,3 +36,7 @@ session_start: "08:00"
 session_end: "20:00"
 paper_starting_cash: "10000"
 flatten_on_session_end: true
+# auto loosens the 5m cost gate after idle time so a quiet book can still enter.
+# manual keeps the YAML cost_multiple / spread / cooldown / notional as written.
+risk_level: auto
+auto_loosen_after_min: 60

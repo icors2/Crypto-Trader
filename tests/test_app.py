@@ -93,7 +93,10 @@ def test_dashboard_and_admin_and_trades(env_settings):
     assert b"SOL-USD" in admin.content
     assert b"HYPE-USD" in admin.content
     assert b"Watchlist" in dash.content
+    assert b"Why no trades" in dash.content
     assert b"what Robinhood can trade" in admin.content
+    assert b"Risk level" in admin.content
+    assert b"auto loosen after" in admin.content.lower() or b"Auto loosen after" in admin.content
 
 
 def test_admin_saves_stop_and_resets_risk(env_settings):
@@ -131,6 +134,20 @@ def test_admin_saves_multi_coin_watchlist(env_settings):
     assert rt.cfg.watchlist() == ["ETH-USD", "SOL-USD", "DOGE-USD", "WIF-USD"]
     assert rt.cfg.max_open_positions == 3
     assert rt.cfg.symbol == "ETH-USD"
+
+
+def test_admin_saves_risk_level(env_settings):
+    client, rt = _logged_in(env_settings)
+    saved = client.post(
+        "/settings",
+        data={"risk_level": "aggressive", "auto_loosen_after_min": "45", "ema_fast": "9", "ema_slow": "21"},
+        follow_redirects=False,
+    )
+    assert saved.status_code == 303
+    assert rt.cfg.risk_level == "aggressive"
+    assert rt.cfg.auto_loosen_after_min == 45
+    assert rt.engine.risk_adjust is not None
+    assert rt.engine.risk_adjust.effective_level == "aggressive"
 
 
 def test_flatten_open_position(env_settings):
