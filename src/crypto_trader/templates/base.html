@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Crypto day trader{% endblock %}</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <header>
+    <div class="brand">Crypto day trader</div>
+    <nav>
+      <a href="/">Dashboard</a>
+      <a href="/settings">Settings</a>
+      <a href="/trades.csv">CSV</a>
+      <form method="post" action="/logout"><button type="submit">Log out</button></form>
+    </nav>
+  </header>
+  <main>{% block body %}{% endblock %}</main>
+</body>
+</html>

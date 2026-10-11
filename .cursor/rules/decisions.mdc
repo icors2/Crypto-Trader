@@ -1,0 +1,86 @@
+---
+description: Architecture and tool decisions (ADRs). Apply when choosing or changing stack, MCP, deploy, or structure.
+alwaysApply: false
+---
+
+# Decisions
+
+Record choices that later agents should not silently reverse. Newest first.
+
+## 2026-10-11 — Crypto day-trader bot
+
+- **Decision:** Paper-by-default FastAPI bot. Coinbase OHLC for indicators in backtest and live; Robinhood v2 bid/ask only for fills, exits, and a quote archive. No unofficial Robinhood libraries. Gemini news filter cut from v1.
+- **Why:** Plan review: sampled mid bars make live ATR tighter than backtest; v2 bid/ask exclude the fee so `fee_bps` must be a real tier (default 100). Gemini adds a key and test surface without helping the core.
+- **Alternatives rejected:** Building live bars from 15s mids; `fee_bps: 0`; unofficial `robinhood` PyPI clients; Next.js UI.
+- **Revisit when:** First live week, or if Robinhood adds public candles.
+
+- **Decision:** Risk stack is daily (auto-reset, includes unrealized) + weekly and cumulative caps that require a manual Resume. Hard ceilings come from `.env` and the settings form cannot raise them.
+- **Why:** A $50 daily halt otherwise runs forever. A compromised UI must not raise its own limits.
+- **Alternatives rejected:** Daily-only halt; trusting the form as the only limiter.
+
+- **Decision:** Trading loop heartbeat + `/healthz` 503 on stale/fatal; unexpected exceptions `sys.exit(1)` so `restart: unless-stopped` recovers. Paused is healthy. Mount `./config/` as a directory. Image includes `tzdata`. STOP file is `data/STOP`.
+- **Why:** Review items 5–7. Single-file bind mounts break atomic YAML writes.
+
+- **Decision:** Local-only / Tailscale. Bind defaults to `127.0.0.1`; compose publishes `127.0.0.1:8000`. Exchange-side `stop_loss` is an accepted risk at $100 notional.
+- **Why:** Plaintext HTTP on `0.0.0.0` cannot use Secure cookies. Bot-managed stops die with the process.
+
+- **Threat model:**
+  - Data: operator session, hashed UI password, trade blotter, Robinhood API keys, quotes
+  - Boundaries: browser → FastAPI (session cookie), loop → Robinhood/Coinbase, loop/UI → SQLite
+  - Attackers: anyone who can reach the port; stolen session; malicious settings POST
+  - Blast radius: one Robinhood account + local DB
+  - Logging: no passwords, tokens, or session IDs
+  - Recovery: rotate `UI_SESSION_SECRET` and Robinhood API key; restore `data/trader.db` via `sqlite3 .backup`
+  - Open risks: no exchange stop backstop; paper overstates live; tax lot matching is operator-owned
+
+## 2026-08-29 — Vibe coder capability layer
+
+## 2026-08-29 — Vibe coder capability layer
+
+- **Decision:** Golden path (`assets/stack-playbooks/golden-path.md`) is **opt-in** when the user has no stack preference — not an automatic default.
+- **Why:** Speed for vibe coding without trapping users who named a stack.
+- **Alternatives rejected:** Golden path as hard default; stay fully silent with no opinionated option.
+- **Revisit when:** Most clones pick the same stack in practice.
+
+- **Decision:** Feature integrations use one `add-integration` skill plus `assets/recipes/*.md`, not six nearly identical skills.
+- **Why:** One procedure; stack/vendor detail stays on-demand; Cloud Agents get portable recipes without user-level vendor skills.
+- **Alternatives rejected:** One skill per integration; relying only on `~/.cursor` vendor skills.
+- **Revisit when:** A recipe grows large enough to need its own skill (migrations already did → `migrate-database`).
+
+- **Decision:** UI polish is a `polish-ui` skill + `assets/checklists/ui-polish.md` (verifiable), with globbed `30-frontend.mdc` for local habits.
+- **Why:** Vibe users judge on look/feel; always-apply must stay short.
+- **Alternatives rejected:** Dumping a full style guide into always-apply rules.
+- **Revisit when:** The product adopts a stricter design system.
+
+## 2026-08-29 — Agent starter hardening
+
+- **Decision:** Boilerplate (CI, GitHub templates, Docker, linters, hooks) stays under `assets/templates/` and is copied on demand — not materialized at repo root.
+- **Why:** Keeps the starter stack-agnostic; Cloud and local clones stay blank until bootstrap.
+- **Alternatives rejected:** Materializing CI/Docker at root; hybrid root+templates for every file.
+- **Revisit when:** The starter itself becomes a product app, or users consistently want default CI at clone time.
+
+- **Decision:** Security is both prose and tooling — `security-review` skill, `security-reviewer` subagent, `20-security.mdc`, checklists, `scripts/scan-secrets.mjs`, and a CI security-scan template.
+- **Why:** Agents need a planned review path and a mechanical gate; Cloud Agents cannot rely on user-level security skills.
+- **Alternatives rejected:** Checklist-only; tooling-only without a review runbook.
+- **Revisit when:** A preferred org-wide scanner replaces the local script.
+
+- **Decision:** Cursor hooks ship as inert templates under `assets/templates/hooks/` (Node `.mjs`), not enabled by default.
+- **Why:** Hooks change every agent run; a bad deny rule blocks work. Node scripts are portable to Windows and Linux Cloud Agents (`.sh` is not).
+- **Alternatives rejected:** Activating `.cursor/hooks.json` out of the box; shell-only hooks.
+- **Revisit when:** The user asks to enable project hooks.
+
+## Template defaults (2026-08-29)
+
+- **Working memory lives in project rules**, not chat and not `~/.cursor`. Cloud Agents only see the repo.
+- **Skills for workflows, rules for constraints.** Bootstrap, MCP, and memory updates are skills.
+- **MCP is opt-in.** The catalog is in `assets/mcp-catalog.md`. `.cursor/mcp.json` starts empty.
+- **No application stack until bootstrap.** Do not assume Next.js, Python, or any framework.
+
+<!--
+## YYYY-MM-DD — Short title
+
+- Decision:
+- Why:
+- Alternatives rejected:
+- Revisit when:
+-->

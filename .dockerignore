@@ -1,0 +1,10 @@
+.git
+.venv
+data/*.db
+data/STOP
+.env
+__pycache__
+.pytest_cache
+.ruff_cache
+assets
+node_modules

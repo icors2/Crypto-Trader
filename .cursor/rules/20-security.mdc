@@ -1,0 +1,14 @@
+---
+alwaysApply: true
+---
+
+# Security non-negotiables
+
+- Never commit secrets. Use `.env` locally and `${env:NAME}` in `.cursor/mcp.json`. Values never belong in rules, skills, or assets.
+- Validate untrusted input at trust boundaries (HTTP handlers, webhooks, CLI args). Prefer a schema library.
+- Parameterize database queries. Never concatenate user input into SQL, shell, or HTML.
+- Authorize per request (and per resource), not only per route. Check tenancy when multi-tenant.
+- Do not log passwords, tokens, session IDs, or raw PII.
+- Before shipping auth, payments, or public data access, follow the `security-review` skill and `assets/checklists/security-review.md`.
+- Never call an AI or payment provider from the client with a secret or API secret key (including test-mode secrets) — proxy server-side. Only publishable/anon keys belong in the browser (see `assets/recipes/ai-feature.md` and `payments.md`).
+- Verify webhook signatures for payment and auth callbacks; never process unsigned bodies to "unblock" local testing.

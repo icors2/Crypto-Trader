@@ -1,0 +1,14 @@
+# Extra exclusions for Agent context (gitignore syntax).
+# This is not a security boundary — the terminal and MCP can still read these files.
+
+.env
+.env.*
+!.env.example
+
+# Generated and vendor
+node_modules/
+dist/
+build/
+.next/
+coverage/
+.venv/

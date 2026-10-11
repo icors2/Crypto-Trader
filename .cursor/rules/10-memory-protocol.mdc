@@ -1,0 +1,32 @@
+---
+alwaysApply: true
+---
+
+# Working memory protocol
+
+Chat does not persist. These rules are the project's memory. Treat them as the source of truth across sessions.
+
+## Read
+
+Before non-trivial work, read `.cursor/rules/memory.mdc`. Pull in `@decisions.mdc`, `@conventions.mdc`, or `@lessons.mdc` when the task touches those topics.
+
+## Write
+
+When you learn something that should still be true next week, persist it in the same turn:
+
+| You learned | Update |
+| --- | --- |
+| Product, stack, status, env var **names**, enabled MCP, current focus | `memory.mdc` |
+| An architecture or tool choice and why | `decisions.mdc` |
+| A coding or repo convention | `conventions.mdc` |
+| A failure mode and the fix | `lessons.mdc` |
+| A multi-step workflow | a skill, not a rule |
+
+Use the `update-working-memory` skill. Keep `memory.mdc` under ~80 lines. Prefer bullets. No secrets. No transcripts.
+
+## Do not
+
+- Do not rely on prior chat to remember decisions.
+- Do not duplicate the same fact in every rule.
+- Do not put procedures in always-apply rules.
+- Do not leave `Status` as `unbootstrapped` after you have set the project up.

@@ -1,0 +1,27 @@
+services:
+  trader:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    env_file:
+      - .env
+    environment:
+      BIND_HOST: "0.0.0.0"
+      PORT: "8000"
+      DATA_DIR: /app/data
+      CONFIG_DIR: /app/config
+    volumes:
+      - ./config:/app/config
+      - ./data:/app/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s

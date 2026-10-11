@@ -1,0 +1,35 @@
+# Runtime knobs. Hard ceilings live in .env and cannot be raised from the UI.
+
+mode: paper
+symbol: BTC-USD
+timeframe_seconds: 300
+ema_fast: 9
+ema_slow: 21
+atr_period: 14
+stop_atr_mult: 1.5
+target_atr_mult: 2.0
+poll_interval_sec: 15
+max_notional_usd: "100"
+daily_loss_limit_usd: "50"
+weekly_loss_limit_usd: "150"
+cumulative_loss_limit_usd: "300"
+# v2 bid/ask exclude the fee. Default to a conservative retail tier; calibrate
+# from logged fee_charged and estimated_price.
+fee_bps: 100
+spread_max_bps: 25
+cost_multiple: "2.0"
+cooldown_bars: 3
+max_hold_minutes: 240
+htf_ema_period: 50
+htf_filter_enabled: false
+htf_timeframe_seconds: 3600
+slippage_bps: 5
+stale_quote_sec: 45
+max_failed_polls: 3
+min_order_size: "0.00000001"
+dust_notional_usd: "1"
+timezone: America/Chicago
+session_start: "08:00"
+session_end: "20:00"
+paper_starting_cash: "10000"
+flatten_on_session_end: true

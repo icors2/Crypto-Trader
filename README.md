@@ -1,4 +1,43 @@
-# Cursor project starter
+# Crypto day trader
+
+Paper-by-default day-trader for Robinhood Crypto. Indicators always come from **Coinbase OHLC** (same path in backtest and live). Robinhood v2 bid/ask is used for fills, exits, and a quote archive. Gemini is not in v1.
+
+This repo started as a Cursor project starter. Product docs are below; starter layout notes follow.
+
+## Go-live bar
+
+Do not flip `mode: live` as a mood decision. All of these must be true:
+
+1. **4 weeks** of paper trading on live Robinhood quotes (Coinbase candles for indicators).
+2. **At least 30** paper trades.
+3. Paper expectancy has the **same sign** as the Coinbase backtest and is not wildly better (paper overstates live).
+4. `fee_bps` has been calibrated from logged `fee_charged` / `estimated_price` (v2 bid/ask **exclude** the fee; default is 100 bps).
+5. `/healthz` has stayed healthy. A dead trading thread must fail the Docker healthcheck.
+
+First live run: `uv run crypto-trader live-check` (read-only account), then **one** minimum-size round trip verified in the Robinhood app, then enable the loop.
+
+Bot-managed stops only work while the process, VM, and network are up. At $100 notional that is an **accepted risk** — v1 does not place an exchange `stop_loss`.
+
+US round trips are taxable disposals. The trade CSV includes fees and cost basis so you can reconcile against Robinhood year-end forms. This is not tax advice.
+
+## Run
+
+```bash
+cp .env.example .env   # fill names locally
+uv sync --all-extras
+uv run uvicorn crypto_trader.app:app --host 127.0.0.1 --port 8000
+```
+
+Or `docker compose up --build`. Mounts `./config/` and `./data/` (STOP file is `data/STOP`). Image includes `tzdata`. Bind stays on `127.0.0.1` in compose; use Tailscale or `tailscale serve` for HTTPS.
+
+```bash
+uv run pytest
+uv run ruff check .
+npm run verify
+uv run crypto-trader backtest
+```
+
+## Cursor project starter
 
 A blank repository that tells a Cursor agent how to stand up a new project: **MCP servers**, **skills**, **assets**, and **working memory** that survives across chats — including the loop from vague idea to live URL.
 

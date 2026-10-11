@@ -1,0 +1,10 @@
+{
+  "install": "uv sync --all-extras",
+  "start": "uv run uvicorn crypto_trader.app:app --host 127.0.0.1 --port 8000",
+  "terminals": [
+    {
+      "name": "trader",
+      "command": "uv run uvicorn crypto_trader.app:app --host 127.0.0.1 --port 8000"
+    }
+  ]
+}

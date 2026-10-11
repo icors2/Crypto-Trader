@@ -74,14 +74,18 @@ Cursor does not keep chat history as memory. **Rules are the memory.**
 
 ## Project-specific
 
-_Status: not bootstrapped._
-
-Replace this section during bootstrap with:
-
-- What this product is
-- Stack and package manager
-- How to install, run, test, and lint
-- Required environment variables (names only)
-- Enabled MCP servers and why
-- How to verify a change (browser, tests, or CLI)
-- Deploy URL and rollback (after first deploy)
+- **Product:** Paper-by-default Robinhood crypto day-trader. 5m EMA cross + ATR stops/targets. Coinbase candles for indicators; Robinhood v2 for fills/exits.
+- **Stack:** Python 3.12, FastAPI, SQLite WAL, Docker. uv for the app; npm only for `verify`.
+- **Install:** `uv sync --all-extras`
+- **Run:** `uv run uvicorn crypto_trader.app:app --host 127.0.0.1 --port 8000` or `docker compose up --build`
+- **Backtest:** `uv run crypto-trader backtest`
+- **Live check:** `uv run crypto-trader live-check` (read-only)
+- **Test:** `uv run pytest`
+- **Lint:** `uv run ruff check .`
+- **Verify:** `npm run verify` (audit + secret scan + ruff + pytest)
+- **Verify a UI change:** log in, open `/` and `/settings`, confirm `/healthz`, write/remove `data/STOP`
+- **Env vars (names):** `UI_PASSWORD_HASH` or `UI_PASSWORD`, `UI_SESSION_SECRET`, `MAX_NOTIONAL_USD`, `MAX_DAILY_LOSS_USD`, `MAX_WEEKLY_LOSS_USD`, `MAX_CUMULATIVE_LOSS_USD`, `ROBINHOOD_API_KEY`, `ROBINHOOD_PRIVATE_KEY`, `ROBINHOOD_ACCOUNT_NUMBER`, `NTFY_TOPIC`, `BIND_HOST`, `PORT`, `DATA_DIR`, `CONFIG_DIR`, `SECURE_COOKIES`, `CONTEXT7_API_KEY`
+- **MCP enabled:** context7 (library docs)
+- **Cloud install:** `uv sync --all-extras`
+- **Deploy:** local Docker / Tailscale. Compose binds `127.0.0.1:8000`. Rollback = previous image + restore `data/trader.db`.
+- **Go-live bar:** see `.cursor/skills/go-live/SKILL.md` and the README.

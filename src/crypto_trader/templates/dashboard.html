@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · Crypto day trader{% endblock %}
+{% block body %}
+<section class="grid">
+  <article class="card">
+    <h2>Health</h2>
+    <div class="pill {{ 'ok' if health.ok else 'bad' }}">{{ health.status }}</div>
+    <p class="note">Heartbeat age: {{ '%.1f'|format(health.heartbeat_age_sec or 0) }}s · paused {{ health.paused }}</p>
+    <p>Mode <strong>{{ cfg.mode }}</strong> · {{ cfg.symbol }} · {{ cfg.timezone }}</p>
+  </article>
+  <article class="card">
+    <h2>Risk</h2>
+    <p>Daily PnL <span class="stat">{{ risk.daily_pnl }}</span></p>
+    <p class="note">Weekly {{ risk.weekly_pnl }} · cumulative {{ risk.cumulative_pnl }}</p>
+    <p class="note">Manual resume required: {{ risk.manual_resume_required }}</p>
+  </article>
+  <article class="card">
+    <h2>Quote</h2>
+    {% if quote %}
+      <p>Bid {{ quote.bid }} / Ask {{ quote.ask }}</p>
+      <p class="note">{{ quote.source }} · entries blocked {{ block_entries }}</p>
+    {% else %}
+      <p class="note">Waiting for first quote…</p>
+    {% endif %}
+  </article>
+  <article class="card">
+    <h2>Open position</h2>
+    {% if position %}
+      <p>{{ position.qty }} @ {{ position.entry_price }}</p>
+      <p class="note">Stop {{ position.stop }} · target {{ position.target }} (stored at entry)</p>
+    {% else %}
+      <p class="note">Flat</p>
+    {% endif %}
+  </article>
+</section>
+
+<section class="card" style="margin-top:1rem">
+  <h2>Controls</h2>
+  <div class="row">
+    <form method="post" action="/halt"><button class="danger" type="submit">Write STOP</button></form>
+    <form method="post" action="/resume"><button type="submit">Resume</button></form>
+  </div>
+  <p class="note">STOP file lives in <code>data/STOP</code>. Weekly/cumulative halts need Resume.</p>
+</section>
+
+<section class="card" style="margin-top:1rem">
+  <h2>Report</h2>
+  <div class="grid">
+    <div>Trades <div class="stat">{{ report.trades }}</div></div>
+    <div>Expectancy <div class="stat">{{ report.expectancy }}</div></div>
+    <div>Avg win / loss <div class="stat">{{ report.avg_win }} / {{ report.avg_loss }}</div></div>
+    <div>Max DD <div class="stat">{{ report.max_drawdown }}</div></div>
+    <div>Fees <div class="stat">{{ report.total_fees }}</div></div>
+    <div>Buy &amp; hold <div class="stat">{{ report.buy_hold_pnl or "n/a" }}</div></div>
+  </div>
+</section>
+
+<section class="card" style="margin-top:1rem">
+  <h2>Recent trades</h2>
+  <table>
+    <thead><tr><th>When</th><th>Qty</th><th>Entry</th><th>Exit</th><th>PnL</th><th>Fees</th><th>Reason</th></tr></thead>
+    <tbody>
+    {% for t in trades %}
+      <tr>
+        <td>{{ t.closed_at }}</td>
+        <td>{{ t.qty }}</td>
+        <td>{{ t.entry_price }}</td>
+        <td>{{ t.exit_price }}</td>
+        <td>{{ t.pnl }}</td>
+        <td>{{ t.entry_fee }} + {{ t.exit_fee }}</td>
+        <td>{{ t.reason }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="7" class="note">No fills yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

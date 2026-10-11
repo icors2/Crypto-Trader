@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Settings · Crypto day trader{% endblock %}
+{% block body %}
+<section class="card">
+  <h2>Strategy and risk</h2>
+  <p class="note">Hard ceilings from the environment: notional ≤ {{ env.max_notional_usd }}, daily ≤ {{ env.max_daily_loss_usd }}, weekly ≤ {{ env.max_weekly_loss_usd }}, cumulative ≤ {{ env.max_cumulative_loss_usd }}, poll ≥ {{ env.min_poll_interval_sec }}s. Saving does not rewrite stored stops on an open position.</p>
+  {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+  <form class="settings" method="post" action="/settings">
+    <div>
+      <label for="mode">Mode</label>
+      <select id="mode" name="mode">
+        <option value="paper" {% if cfg.mode == "paper" %}selected{% endif %}>paper</option>
+        <option value="live" {% if cfg.mode == "live" %}selected{% endif %}>live</option>
+      </select>
+    </div>
+    <div><label for="symbol">Symbol</label><input id="symbol" name="symbol" value="{{ cfg.symbol }}"></div>
+    <div><label for="ema_fast">Fast EMA</label><input id="ema_fast" name="ema_fast" type="number" value="{{ cfg.ema_fast }}"></div>
+    <div><label for="ema_slow">Slow EMA</label><input id="ema_slow" name="ema_slow" type="number" value="{{ cfg.ema_slow }}"></div>
+    <div><label for="atr_period">ATR period</label><input id="atr_period" name="atr_period" type="number" value="{{ cfg.atr_period }}"></div>
+    <div><label for="stop_atr_mult">Stop ATR mult</label><input id="stop_atr_mult" name="stop_atr_mult" value="{{ cfg.stop_atr_mult }}"></div>
+    <div><label for="target_atr_mult">Target ATR mult</label><input id="target_atr_mult" name="target_atr_mult" value="{{ cfg.target_atr_mult }}"></div>
+    <div><label for="poll_interval_sec">Poll interval (s)</label><input id="poll_interval_sec" name="poll_interval_sec" type="number" value="{{ cfg.poll_interval_sec }}"></div>
+    <div><label for="max_notional_usd">Max notional</label><input id="max_notional_usd" name="max_notional_usd" value="{{ cfg.max_notional_usd }}"></div>
+    <div><label for="daily_loss_limit_usd">Daily loss</label><input id="daily_loss_limit_usd" name="daily_loss_limit_usd" value="{{ cfg.daily_loss_limit_usd }}"></div>
+    <div><label for="weekly_loss_limit_usd">Weekly loss</label><input id="weekly_loss_limit_usd" name="weekly_loss_limit_usd" value="{{ cfg.weekly_loss_limit_usd }}"></div>
+    <div><label for="cumulative_loss_limit_usd">Cumulative loss</label><input id="cumulative_loss_limit_usd" name="cumulative_loss_limit_usd" value="{{ cfg.cumulative_loss_limit_usd }}"></div>
+    <div><label for="fee_bps">Fee (bps)</label><input id="fee_bps" name="fee_bps" type="number" value="{{ cfg.fee_bps }}"></div>
+    <div><label for="spread_max_bps">Max spread (bps)</label><input id="spread_max_bps" name="spread_max_bps" type="number" value="{{ cfg.spread_max_bps }}"></div>
+    <div><label for="cost_multiple">Cost multiple</label><input id="cost_multiple" name="cost_multiple" value="{{ cfg.cost_multiple }}"></div>
+    <div><label for="cooldown_bars">Cooldown bars</label><input id="cooldown_bars" name="cooldown_bars" type="number" value="{{ cfg.cooldown_bars }}"></div>
+    <div><label for="max_hold_minutes">Max hold (min)</label><input id="max_hold_minutes" name="max_hold_minutes" type="number" value="{{ cfg.max_hold_minutes }}"></div>
+    <div><label for="slippage_bps">Slippage (bps)</label><input id="slippage_bps" name="slippage_bps" type="number" value="{{ cfg.slippage_bps }}"></div>
+    <div><label for="session_start">Session start</label><input id="session_start" name="session_start" value="{{ cfg.session_start }}"></div>
+    <div><label for="session_end">Session end</label><input id="session_end" name="session_end" value="{{ cfg.session_end }}"></div>
+    <div><label for="timezone">Timezone</label><input id="timezone" name="timezone" value="{{ cfg.timezone }}"></div>
+    <div>
+      <label for="htf_filter_enabled">1h EMA filter</label>
+      <select id="htf_filter_enabled" name="htf_filter_enabled">
+        <option value="false" {% if not cfg.htf_filter_enabled %}selected{% endif %}>off</option>
+        <option value="true" {% if cfg.htf_filter_enabled %}selected{% endif %}>on</option>
+      </select>
+    </div>
+    <div class="row" style="grid-column: 1 / -1">
+      <button type="submit">Save</button>
+    </div>
+  </form>
+</section>
+{% endblock %}

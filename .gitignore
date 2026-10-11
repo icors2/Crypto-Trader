@@ -1,0 +1,46 @@
+# Secrets and local env
+.env
+.env.*
+!.env.example
+
+# Dependencies and build
+node_modules/
+dist/
+build/
+.next/
+.nuxt/
+.output/
+coverage/
+*.tsbuildinfo
+
+# Tooling
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Cursor / Netlify / Vercel local
+.cursor/hooks/*.local.*
+.netlify/
+.vercel/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+
+# Bot runtime
+data/*.db
+data/*.db-*
+data/STOP
+data/*.csv
+
+# OS / editor
+*.swp
+*~

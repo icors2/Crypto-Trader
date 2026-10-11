@@ -1,0 +1,39 @@
+---
+alwaysApply: true
+---
+
+# Cursor setup repo
+
+This repository starts blank. Until `.cursor/rules/memory.mdc` says the project is `active`, treat setup as the priority: MCP, skills, assets, then application code.
+
+## First turn in an unbootstrapped repo
+
+1. Read `.cursor/rules/memory.mdc`.
+2. If `Status` is `unbootstrapped`, follow the `bootstrap-project` skill before scaffolding product code.
+3. Infer the product from the user request. Vague asks → `scope-feature`. Ask only what you cannot infer.
+4. Persist what you learned with the `update-working-memory` skill.
+
+## After implementing
+
+- Prove it: `verify-change` (smoke the critical path). Ship PR: `ship-change`. Live URL: `deploy-app`.
+- Breaks: `debug-issue`. Risky work: `checkpoint-rollback`.
+- Security-sensitive: `security-review` (see `20-security.mdc`).
+- Spend/quotas: `assets/reference/cost-and-quotas.md`.
+
+## What lives where
+
+- Durable facts → `.cursor/rules/` (working memory)
+- Multi-step workflows → `.cursor/skills/<name>/SKILL.md`
+- Feature recipes → `assets/recipes/` via `add-integration`
+- Shared MCP → `.cursor/mcp.json` with `${env:NAME}` only
+- Catalogs and templates → `assets/`
+- How to run and test → `AGENTS.md`
+
+## Hard constraints
+
+- Never commit secrets. Never put real tokens in `mcp.json`, rules, or skills.
+- Enable only MCP servers this project will use. Do not install the whole catalog.
+- Keep always-apply rules short. Long playbooks belong in skills or `assets/`.
+- Project rules must be `.mdc`. Skill `name` must match its folder.
+- After changing rules, skills, or MCP, commit so later agents inherit the knowledge.
+- Do not activate `assets/templates/hooks/` unless the user asked.

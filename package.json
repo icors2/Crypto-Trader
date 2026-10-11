@@ -6,6 +6,6 @@
   "scripts": {
     "audit": "node scripts/audit-cursor-setup.mjs",
     "scan-secrets": "node scripts/scan-secrets.mjs",
-    "verify": "node scripts/audit-cursor-setup.mjs && node scripts/scan-secrets.mjs"
+    "verify": "node scripts/audit-cursor-setup.mjs && node scripts/scan-secrets.mjs && uv run ruff check . && uv run pytest"
   }
 }

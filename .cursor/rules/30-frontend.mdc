@@ -1,0 +1,15 @@
+---
+description: Frontend habits for React/TS/CSS files. Applied when editing UI source.
+globs: "**/*.{tsx,jsx,css}"
+alwaysApply: false
+---
+
+# Frontend
+
+- Prefer Tailwind utility classes over one-off CSS files for app UI.
+- Event handlers: `handleClick`, `handleKeyDown`, etc.
+- Early returns over deep nesting.
+- No `any` in TypeScript — use `unknown` and narrow.
+- Accessibility: labels / `aria-label`, keyboard activation for custom controls, visible focus.
+- One component library only (see `assets/reference/ui-design.md`).
+- Const arrow functions for components/handlers when that matches the file's style.

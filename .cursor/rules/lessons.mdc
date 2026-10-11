@@ -1,0 +1,42 @@
+---
+description: Failure modes and fixes learned in this repo. Apply when debugging or repeating a past mistake.
+alwaysApply: false
+---
+
+# Lessons
+
+Write the mistake, the signal, and the fix. Newest first.
+
+## 2026-10-11 — Plan review (do not regress)
+
+- **Fee_bps 0 because "spread is in the quote."** Signal: paper PnL too good. Fix: v2 bid/ask exclude the fee; default `fee_bps` to the real tier and log `fee_charged`.
+- **Live bars from 15s mids.** Signal: live ATR tighter than backtest. Fix: Coinbase candles in both modes.
+- **Daily halt only.** Signal: unlimited $50/day bleed. Fix: weekly + cumulative caps + unrealized in the daily check; weekly/cumulative need manual resume.
+- **Uvicorn up, trading thread dead.** Signal: container healthy, positions unmanaged. Fix: heartbeat + `/healthz` 503 + fatal exit.
+- **Single-file config bind mount.** Signal: atomic replace detaches. Fix: mount `./config/`.
+- **python:slim and America/Chicago.** Signal: `ZoneInfoNotFoundError`. Fix: install `tzdata`; test DST transition days.
+
+## 2026-08-29 — Starter hardening
+
+- **Bare `npx` in MCP on Windows fails.** Signal: `spawn npx ENOENT`. Fix: use `"command": "cmd", "args": ["/c", "npx", …]` on Windows; keep `"command": "npx"` on macOS/Linux/Cloud. Documented in `assets/mcp-catalog.md`.
+- **Hook scripts as `.sh` break on Windows.** Signal: hooks never fire or fail to spawn. Fix: use Node `.mjs` hooks so the same template works on Windows laptops and Linux Cloud Agents.
+- **Semgrep hosted MCP is dead.** Signal: `mcp.semgrep.ai` / `uvx semgrep-mcp` archived. Fix: `"command": "semgrep", "args": ["mcp"]` with Semgrep CLI installed.
+- **`beforeReadFile` payload field is `file_path`.** Signal: redact hook always allowed. Fix: read `payload.file_path` (and strip UTF-8 BOM before `JSON.parse`). Use `failClosed: true` on deny hooks.
+
+## Cursor platform (from the template)
+
+- **`.md` in `.cursor/rules/` is ignored.** Use `.mdc` with frontmatter.
+- **Skill `name` must match the folder.** `shipping/land-it/SKILL.md` is the skill `land-it`.
+- **User-level `~/.cursor/*` does not reach Cloud Agents.** Put skills, rules, and MCP the project needs in the repo.
+- **Sandbox may block writes to `.cursor/*.json`.** Rules and skills are writable; `mcp.json` may not be.
+- **Do not hardcode secrets in `mcp.json`.** Use `${env:NAME}` or Cloud Secrets.
+- **Cloud MCP does not support SSE or `mcp-remote`.** Prefer HTTP.
+- **`environment.json` `install` is not for long-running processes.** Use `start` / `terminals`.
+
+<!--
+## YYYY-MM-DD — Short title
+
+- What happened:
+- Signal:
+- Fix:
+-->

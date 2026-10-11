@@ -1,0 +1,52 @@
+---
+alwaysApply: true
+---
+
+# Working memory
+
+Agents update this file. It is the living snapshot of the project.
+
+## Status
+
+- **Status:** active
+- **Updated:** 2026-10-11
+
+## Project
+
+- **Name:** Crypto-Trader
+- **Purpose:** Paper-by-default Robinhood crypto day-trader. Coinbase OHLC for indicators in both modes; Robinhood v2 quotes for fills/exits. Self-hosted FastAPI UI + Docker.
+- **Stack:** Python 3.12, FastAPI/Uvicorn, SQLite WAL, official Robinhood Crypto API v2 (httpx + PyNaCl), Coinbase Exchange public candles, Jinja UI
+- **Package manager:** uv (app) + npm (verify scripts)
+- **Deploy target:** local Docker / Tailscale VM (not a public SaaS)
+
+## Current focus
+
+- First product slice from `Crypto day-trader bot plan review.md`: paper loop, risk halts, healthcheck, settings UI, backtest/report extras.
+
+## Open questions
+
+- Calibrate `fee_bps` from real `fee_charged` after a few days of quotes.
+- Confirm current Robinhood v2 field names again immediately before the first live order.
+
+## Environment (names only)
+
+- Required env vars: `UI_PASSWORD_HASH` or `UI_PASSWORD`, `UI_SESSION_SECRET`, `MAX_NOTIONAL_USD`, `MAX_DAILY_LOSS_USD`, `MAX_WEEKLY_LOSS_USD`, `MAX_CUMULATIVE_LOSS_USD`
+- Live-only: `ROBINHOOD_API_KEY`, `ROBINHOOD_PRIVATE_KEY`, `ROBINHOOD_ACCOUNT_NUMBER`
+- Optional: `NTFY_TOPIC`, `NTFY_URL`, `SECURE_COOKIES`, `BIND_HOST`, `PORT`, `DATA_DIR`, `CONFIG_DIR`, `CONTEXT7_API_KEY`
+- Enabled MCP servers: context7
+- Project skills: bootstrap-project, add-mcp-server, create-project-skill, update-working-memory, audit-cursor-setup, security-review, verify-change, ship-change, scope-feature, deploy-app, debug-issue, checkpoint-rollback, add-integration, migrate-database, polish-ui, run-backtest, go-live
+
+## People and systems
+
+- Operator: Chris O'Neal (plan review 2026-10-10)
+- Broker: Robinhood Crypto API v2
+- Indicators: Coinbase Exchange public candles
+
+## Pointers
+
+- Decisions: `.cursor/rules/decisions.mdc`
+- Conventions: `.cursor/rules/conventions.mdc`
+- Lessons: `.cursor/rules/lessons.mdc`
+- Security: `.cursor/rules/20-security.mdc`
+- Plan review: `Crypto day-trader bot plan review.md`
+- Verify: `npm run verify` (audit + secret scan + ruff + pytest)
