@@ -34,7 +34,7 @@ Agents update this file. It is the living snapshot of the project.
 - Live-only: `ROBINHOOD_API_KEY`, `ROBINHOOD_PRIVATE_KEY`, `ROBINHOOD_ACCOUNT_NUMBER`
 - Optional: `NTFY_TOPIC`, `NTFY_URL`, `SECURE_COOKIES`, `BIND_HOST`, `PORT`, `DATA_DIR`, `CONFIG_DIR`, `CONTEXT7_API_KEY`
 - Enabled MCP servers: context7
-- Project skills: bootstrap-project, add-mcp-server, create-project-skill, update-working-memory, audit-cursor-setup, security-review, verify-change, ship-change, scope-feature, deploy-app, debug-issue, checkpoint-rollback, add-integration, migrate-database, polish-ui, run-backtest, go-live
+- Project skills: bootstrap-project, add-mcp-server, create-project-skill, update-working-memory, audit-cursor-setup, security-review, verify-change, ship-change, scope-feature, deploy-app, setup-vm, debug-issue, checkpoint-rollback, add-integration, migrate-database, polish-ui, run-backtest, go-live
 
 ## People and systems
 
@@ -49,4 +49,5 @@ Agents update this file. It is the living snapshot of the project.
 - Lessons: `.cursor/rules/lessons.mdc`
 - Security: `.cursor/rules/20-security.mdc`
 - Plan review: `Crypto day-trader bot plan review.md`
+- VM / first-time setup: `SETUP.md` (skill `setup-vm`)
 - Verify: `npm run verify` (audit + secret scan + ruff + pytest)

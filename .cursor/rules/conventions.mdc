@@ -28,6 +28,7 @@ Add a bullet only after it is a real project habit. Do not paste a style guide.
 - Config lives in `config/config.yaml` (directory mount). Use ruamel.yaml so comments survive.
 - `/healthz` is the liveness signal for Docker. Paused ≠ dead.
 - Paper cash and holdings live in SQLite, not only in memory. Admin `/paper/*` routes are paper-mode only.
+- First-time and VM install is `SETUP.md`. Agents follow it instead of inventing a deploy path.
 - `npm run verify` runs the starter audit, secret scan, ruff, and pytest.
 
 <!--

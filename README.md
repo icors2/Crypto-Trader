@@ -22,8 +22,10 @@ US round trips are taxable disposals. The trade CSV includes fees and cost basis
 
 ## Run
 
+**New machine or test VM:** follow [SETUP.md](SETUP.md) (written so another AI agent can execute it). Keep `mode: paper`.
+
 ```bash
-cp .env.example .env   # fill names locally
+cp .env.example .env   # fill values locally; never commit .env
 uv sync --all-extras
 uv run uvicorn crypto_trader.app:app --host 127.0.0.1 --port 8000
 ```

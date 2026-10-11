@@ -77,6 +77,7 @@ Cursor does not keep chat history as memory. **Rules are the memory.**
 - **Product:** Paper-by-default Robinhood crypto day-trader. 5m EMA cross + ATR stops/targets. Coinbase candles for indicators; Robinhood v2 for fills/exits.
 - **Stack:** Python 3.12, FastAPI, SQLite WAL, Docker. uv for the app; npm only for `verify`.
 - **Install:** `uv sync --all-extras`
+- **First-time / VM setup:** follow `SETUP.md` (skill `setup-vm`). Paper only.
 - **Run:** `uv run uvicorn crypto_trader.app:app --host 127.0.0.1 --port 8000` or `docker compose up --build`
 - **Backtest:** `uv run crypto-trader backtest`
 - **Live check:** `uv run crypto-trader live-check` (read-only)

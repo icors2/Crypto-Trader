@@ -1,7 +1,11 @@
+# Paper trader on a VM or laptop.
+# Host bind stays on loopback. Secrets come from .env (untracked).
+
 services:
   trader:
-    build: .
-    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "127.0.0.1:8000:8000"
     env_file:
@@ -9,19 +13,10 @@ services:
     environment:
       BIND_HOST: "0.0.0.0"
       PORT: "8000"
-      DATA_DIR: /app/data
       CONFIG_DIR: /app/config
+      DATA_DIR: /app/data
+      TZ: America/Chicago
     volumes:
       - ./config:/app/config
       - ./data:/app/data
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "5"
-    healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/healthz"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 40s
+    restart: unless-stopped
