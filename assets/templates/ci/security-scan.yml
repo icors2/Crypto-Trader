@@ -1,0 +1,56 @@
+# Copy to .github/workflows/security-scan.yml during bootstrap when you want CI scanning.
+# Adjust package-manager / language steps for your stack.
+
+name: Security scan
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    name: Gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  semgrep:
+    name: Semgrep
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@v4
+      - run: semgrep scan --config auto --error --quiet
+
+  starter-verify:
+    name: Starter verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm run verify
+
+  dependency-audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      # Prefer npm/pnpm/yarn audit for JS; add pip-audit / cargo audit when relevant.
+      - name: npm audit (if package-lock exists)
+        run: |
+          if [ -f package-lock.json ]; then npm audit --audit-level=high; else echo "No package-lock.json; skip"; fi

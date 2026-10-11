@@ -1,0 +1,16 @@
+# Local compose example. Copy to compose.yml and wire your service.
+# Do not put production secrets here — use env files that stay untracked.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${PORT:-3000}:${PORT:-3000}"
+    environment:
+      PORT: ${PORT:-3000}
+      # Add DATABASE_URL via env_file or platform secrets — do not commit values
+    # env_file:
+    #   - .env
+    restart: unless-stopped

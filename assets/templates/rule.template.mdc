@@ -1,0 +1,11 @@
+---
+description: When the agent should pull this rule in. Required for Apply Intelligently.
+alwaysApply: false
+---
+
+# Rule title
+
+- Concrete instruction
+- Another concrete instruction
+
+@path/to/example.ts

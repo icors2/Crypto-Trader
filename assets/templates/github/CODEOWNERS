@@ -1,0 +1,8 @@
+# Copy to .github/CODEOWNERS and replace owners.
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+*       @YOUR_ORG/YOUR_TEAM
+
+/.cursor/                 @YOUR_ORG/YOUR_TEAM
+/assets/                  @YOUR_ORG/YOUR_TEAM
+/.github/workflows/       @YOUR_ORG/YOUR_TEAM

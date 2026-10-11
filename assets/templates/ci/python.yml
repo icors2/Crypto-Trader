@@ -1,0 +1,37 @@
+# Copy to .github/workflows/ci.yml for a Python app (uv preferred).
+
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: uv sync --all-extras
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - name: Typecheck (if configured)
+        run: |
+          if uv run python -c "import mypy" 2>/dev/null; then uv run mypy .; else echo "mypy not installed; skip"; fi
+      - run: uv run pytest
+      - name: Starter verify (if present)
+        run: |
+          if [ -f package.json ] && [ -f scripts/audit-cursor-setup.mjs ]; then
+            npm run verify
+          else
+            echo "skip"
+          fi

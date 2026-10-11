@@ -1,0 +1,14 @@
+# Ruff — copy to ruff.toml or merge into pyproject.toml [tool.ruff]
+# https://docs.astral.sh/ruff/
+
+target-version = "py312"
+line-length = 100
+
+[lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[lint.isort]
+known-first-party = ["src"]
+
+[format]
+quote-style = "double"
