@@ -82,6 +82,11 @@ def test_dashboard_and_admin_and_trades(env_settings):
     assert b"Admin" in admin.content
     assert b"Stop ATR multiple" in admin.content
     assert b"Reset all risk counters" in admin.content
+    assert b"Paper account" in dash.content
+    assert b"10000" in dash.content
+    assert b"Save paper account" in admin.content
+    assert b"Deposit" in admin.content
+    assert b"Reset paper account" in admin.content
 
 
 def test_admin_saves_stop_and_resets_risk(env_settings):

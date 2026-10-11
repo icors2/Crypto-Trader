@@ -21,7 +21,7 @@ Agents update this file. It is the living snapshot of the project.
 
 ## Current focus
 
-- Operator UI: dashboard + full trade blotter + admin (risk, stop/target, flatten, resets).
+- Paper account is a persisted SQLite ledger. Admin can set cash, starting cash, deposit/withdraw, holdings, and reset.
 
 ## Open questions
 

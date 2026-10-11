@@ -24,7 +24,7 @@ from crypto_trader.db import Database
 from crypto_trader.health import Heartbeat
 from crypto_trader.loop import Engine
 from crypto_trader.models import ExitReason
-from crypto_trader.paper import PaperBroker
+from crypto_trader.paper import PaperAccount, PaperBroker, paper_view
 from crypto_trader.reports import trade_report, trades_to_csv
 from crypto_trader.risk import RiskEngine
 from crypto_trader.settings import EnvSettings
@@ -54,7 +54,8 @@ class Runtime:
         self.auth = Auth(self.settings)
         self.feed = CoinbaseFeed()
         self.broker = PaperBroker(self.cfg.fee_bps, self.cfg.slippage_bps)
-        self.broker.cash = self.cfg.paper_starting_cash
+        self.broker.load_account(self.db.load_paper_account(self.cfg.paper_starting_cash))
+        self.persist_paper()
         if self.cfg.mode == "live":
             if not (
                 self.settings.robinhood_api_key
@@ -85,6 +86,16 @@ class Runtime:
         )
         self.start_loop = start_loop
         self.thread: threading.Thread | None = None
+
+    def persist_paper(self) -> None:
+        if not isinstance(self.broker, PaperBroker):
+            return
+        self.db.save_paper_account(self.broker.to_account(), now_utc())
+
+    def paper_snapshot(self) -> dict[str, Any] | None:
+        if not isinstance(self.broker, PaperBroker):
+            return None
+        return paper_view(self.broker.to_account(), self.engine.last_quote)
 
     def boot_loop(self) -> None:
         if not self.start_loop:
@@ -201,6 +212,7 @@ def create_app(runtime: Runtime | None = None, start_loop: bool = True) -> FastA
                 "block_entries": rt.engine.block_entries,
                 "notice": _notice(request),
                 "events": rt.db.recent_events(8),
+                "paper": rt.paper_snapshot(),
             },
         )
 
@@ -233,6 +245,7 @@ def create_app(runtime: Runtime | None = None, start_loop: bool = True) -> FastA
                 "risk": rt.risk.state,
                 "position": rt.db.open_position(),
                 "audits": rt.db.list_config_audit(15),
+                "paper": rt.paper_snapshot(),
             },
         )
 
@@ -304,6 +317,9 @@ def create_app(runtime: Runtime | None = None, start_loop: bool = True) -> FastA
         rt.risk.cfg = rt.cfg
         rt.broker.fee_bps = rt.cfg.fee_bps
         rt.broker.slippage_bps = rt.cfg.slippage_bps
+        if isinstance(rt.broker, PaperBroker):
+            rt.broker.starting_cash = rt.cfg.paper_starting_cash
+            rt.persist_paper()
         rt.db.record_config_audit(now_utc(), "ui", old, json.dumps(rt.cfg.as_public_dict()))
         return RedirectResponse("/settings?notice=saved", status_code=303)
 
@@ -363,6 +379,136 @@ def create_app(runtime: Runtime | None = None, start_loop: bool = True) -> FastA
         rt.engine.block_entries = False
         rt.db.record_event("info", "reset_risk", "operator reset risk counters", now_utc())
         return RedirectResponse("/settings?notice=risk_reset", status_code=303)
+
+    def _require_paper() -> RedirectResponse | None:
+        if not isinstance(rt.broker, PaperBroker):
+            return RedirectResponse("/settings?notice=paper_only", status_code=303)
+        return None
+
+    def _apply_paper(account: PaperAccount) -> None:
+        rt.broker.apply_account(account)
+        rt.persist_paper()
+
+    def _sync_starting_cash(account: PaperAccount) -> None:
+        if account.starting_cash == rt.cfg.paper_starting_cash:
+            return
+        rt.cfg = save_config(
+            rt.settings.config_path,
+            {"paper_starting_cash": account.starting_cash},
+            rt.settings,
+        )
+        rt.engine.cfg = rt.cfg
+
+    @app.post("/paper/account")
+    async def paper_account(request: Request) -> Response:
+        denied = require_login(request)
+        if denied:
+            return denied
+        paper_only = _require_paper()
+        if paper_only:
+            return paper_only
+        form = await request.form()
+        account = rt.broker.to_account()
+        try:
+            if "name" in form:
+                account.set_name(str(form["name"]))
+            if str(form.get("cash") or "").strip():
+                account.set_cash(str(form["cash"]))
+            if str(form.get("starting_cash") or "").strip():
+                account.set_starting_cash(str(form["starting_cash"]))
+                _sync_starting_cash(account)
+        except (ValueError, ArithmeticError) as exc:
+            return settings_form(request, error=str(exc))
+        _apply_paper(account)
+        rt.db.record_event("info", "paper_account", "operator updated paper ledger", now_utc())
+        return RedirectResponse("/settings?notice=paper_saved", status_code=303)
+
+    @app.post("/paper/deposit")
+    async def paper_deposit(request: Request) -> Response:
+        denied = require_login(request)
+        if denied:
+            return denied
+        paper_only = _require_paper()
+        if paper_only:
+            return paper_only
+        form = await request.form()
+        account = rt.broker.to_account()
+        try:
+            account.deposit(str(form.get("amount") or ""))
+        except (ValueError, ArithmeticError) as exc:
+            return settings_form(request, error=str(exc))
+        _apply_paper(account)
+        rt.db.record_event("info", "paper_deposit", f"deposited {account.cash}", now_utc())
+        return RedirectResponse("/settings?notice=paper_deposited", status_code=303)
+
+    @app.post("/paper/withdraw")
+    async def paper_withdraw(request: Request) -> Response:
+        denied = require_login(request)
+        if denied:
+            return denied
+        paper_only = _require_paper()
+        if paper_only:
+            return paper_only
+        form = await request.form()
+        account = rt.broker.to_account()
+        try:
+            account.withdraw(str(form.get("amount") or ""))
+        except (ValueError, ArithmeticError) as exc:
+            return settings_form(request, error=str(exc))
+        _apply_paper(account)
+        rt.db.record_event("info", "paper_withdraw", f"cash now {account.cash}", now_utc())
+        return RedirectResponse("/settings?notice=paper_withdrawn", status_code=303)
+
+    @app.post("/paper/holding")
+    async def paper_holding(request: Request) -> Response:
+        denied = require_login(request)
+        if denied:
+            return denied
+        paper_only = _require_paper()
+        if paper_only:
+            return paper_only
+        form = await request.form()
+        account = rt.broker.to_account()
+        try:
+            account.set_holding(str(form.get("asset") or ""), str(form.get("qty") or ""))
+        except (ValueError, ArithmeticError) as exc:
+            return settings_form(request, error=str(exc))
+        _apply_paper(account)
+        rt.db.record_event("info", "paper_holding", "operator set paper holding", now_utc())
+        return RedirectResponse("/settings?notice=paper_holding", status_code=303)
+
+    @app.post("/paper/reset")
+    async def paper_reset(request: Request) -> Response:
+        denied = require_login(request)
+        if denied:
+            return denied
+        paper_only = _require_paper()
+        if paper_only:
+            return paper_only
+        form = await request.form()
+        wipe_history = str(form.get("wipe_history") or "") in {"1", "true", "on", "yes"}
+        reset_risk = str(form.get("reset_risk") or "") in {"1", "true", "on", "yes"}
+        account = rt.broker.to_account()
+        account.reset_ledger()
+        rt.broker.orders.clear()
+        _apply_paper(account)
+        if wipe_history:
+            rt.db.wipe_paper_history()
+        else:
+            rt.db.close_open_positions()
+        if reset_risk:
+            if rt.settings.stop_path.exists():
+                rt.settings.stop_path.unlink()
+            rt.risk.reset_risk_counters()
+            rt.engine.cooldown_remaining = 0
+            rt.engine.block_entries = False
+        rt.db.record_event(
+            "info",
+            "paper_reset",
+            "operator reset paper account" + (" and history" if wipe_history else ""),
+            now_utc(),
+        )
+        return RedirectResponse("/settings?notice=paper_reset", status_code=303)
 
     @app.get("/trades.csv")
     def export_csv(request: Request) -> Response:

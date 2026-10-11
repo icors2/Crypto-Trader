@@ -9,6 +9,7 @@ from pathlib import Path
 
 from crypto_trader.models import Order, OrderStatus, Position, PositionStatus, Quote, Side, Trade
 from crypto_trader.money import D
+from crypto_trader.paper import PaperAccount
 
 SCHEMA = """
 PRAGMA journal_mode=WAL;
@@ -89,6 +90,19 @@ CREATE TABLE IF NOT EXISTS meta (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS paper_account (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    name TEXT NOT NULL,
+    cash TEXT NOT NULL,
+    starting_cash TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS paper_holdings (
+    asset TEXT PRIMARY KEY,
+    qty TEXT NOT NULL
+);
 """
 
 
@@ -146,6 +160,55 @@ class Database:
         with self.connect() as conn:
             row = conn.execute("SELECT value FROM meta WHERE key=?", (key,)).fetchone()
         return row["value"] if row else default
+
+    def close_open_positions(self) -> None:
+        with self.write() as conn:
+            conn.execute(
+                "UPDATE positions SET status='closed', qty='0' WHERE status IN ('open','dust')"
+            )
+
+    def load_paper_account(self, default_cash) -> PaperAccount:
+        with self.connect() as conn:
+            row = conn.execute("SELECT * FROM paper_account WHERE id=1").fetchone()
+            holds = conn.execute("SELECT asset, qty FROM paper_holdings").fetchall()
+        holdings = {r["asset"]: D(r["qty"]) for r in holds if D(r["qty"]) != 0}
+        if row is None:
+            return PaperAccount(name="Paper", cash=D(default_cash), starting_cash=D(default_cash), holdings=holdings)
+        return PaperAccount(
+            name=row["name"],
+            cash=D(row["cash"]),
+            starting_cash=D(row["starting_cash"]),
+            holdings=holdings,
+        )
+
+    def save_paper_account(self, account: PaperAccount, ts: datetime) -> None:
+        with self.write() as conn:
+            conn.execute(
+                """
+                INSERT INTO paper_account(id, name, cash, starting_cash, updated_at)
+                VALUES(1, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    name=excluded.name,
+                    cash=excluded.cash,
+                    starting_cash=excluded.starting_cash,
+                    updated_at=excluded.updated_at
+                """,
+                (account.name, str(account.cash), str(account.starting_cash), _iso(ts)),
+            )
+            conn.execute("DELETE FROM paper_holdings")
+            for asset, qty in account.holdings.items():
+                if D(qty) == 0:
+                    continue
+                conn.execute(
+                    "INSERT INTO paper_holdings(asset, qty) VALUES(?, ?)",
+                    (asset.upper(), str(D(qty))),
+                )
+
+    def wipe_paper_history(self) -> None:
+        with self.write() as conn:
+            conn.execute("DELETE FROM trades")
+            conn.execute("DELETE FROM orders")
+            conn.execute("UPDATE positions SET status='closed', qty='0' WHERE status IN ('open','dust')")
 
     def record_quote(self, quote: Quote) -> None:
         with self.write() as conn:

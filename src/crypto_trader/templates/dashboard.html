@@ -9,6 +9,20 @@
     <p>Mode <strong>{{ cfg.mode }}</strong> · {{ cfg.symbol }} · {{ cfg.timezone }} {{ cfg.session_start }}–{{ cfg.session_end }}</p>
   </article>
   <article class="card">
+    <h2>Paper account</h2>
+    {% if paper %}
+      <p>Cash <span class="stat">{{ paper.cash }}</span></p>
+      <p class="note">Equity {{ paper.equity }} · starting {{ paper.starting_cash }} · {{ paper.name }}</p>
+      {% if paper.holdings %}
+        <p class="note">{% for asset, qty in paper.holdings %}{{ asset }} {{ qty }}{% if not loop.last %} · {% endif %}{% endfor %}</p>
+      {% else %}
+        <p class="note">No holdings. Adjust cash and inventory in Admin.</p>
+      {% endif %}
+    {% else %}
+      <p class="note">Live mode — Robinhood balances are not editable here.</p>
+    {% endif %}
+  </article>
+  <article class="card">
     <h2>Risk</h2>
     <p>Daily PnL <span class="stat">{{ risk.daily_pnl }}</span></p>
     <p class="note">Weekly {{ risk.weekly_pnl }} · cumulative {{ risk.cumulative_pnl }}</p>

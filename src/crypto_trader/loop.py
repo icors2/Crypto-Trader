@@ -100,6 +100,11 @@ class Engine:
             self.db.record_event("warning", "reconcile", item, now_utc())
             self.alerts.send("reconcile mismatch", item, priority="high")
         self.health.touch(reason="started")
+        self._persist_paper()
+
+    def _persist_paper(self) -> None:
+        if isinstance(self.broker, PaperBroker):
+            self.db.save_paper_account(self.broker.to_account(), now_utc())
 
     def maybe_reload_config(self) -> None:
         path = self.settings.config_path
@@ -185,6 +190,7 @@ class Engine:
             return
         order = self.broker.place_order(Side.SELL, position.symbol, position.qty, quote)
         self.db.upsert_order(order)
+        self._persist_paper()
         if order.status in {OrderStatus.FILLED, OrderStatus.PARTIALLY_FILLED} and order.average_price:
             qty = order.filled_qty
             exit_price = order.average_price
@@ -262,6 +268,7 @@ class Engine:
         order = self.broker.place_order(Side.BUY, self.cfg.symbol, qty, quote)
         client_id = order.client_order_id
         self.db.upsert_order(order)
+        self._persist_paper()
         if order.status is OrderStatus.PENDING:
             return
         if order.filled_qty <= 0 or order.average_price is None:

@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Admin · Crypto day trader{% endblock %}
 {% block body %}
+{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
 <section class="card">
   <h2>Admin · operator actions</h2>
   <p class="note">Halt, resume, flatten, and reset risk counters. Changing stop ATR here does <strong>not</strong> rewrite an open position’s stored stop/target.</p>
@@ -26,9 +27,90 @@
 </section>
 
 <section class="card" style="margin-top:1rem">
+  <h2>Paper account</h2>
+  {% if paper %}
+    <p class="note">This is a simulated ledger. Cash, holdings, and the reset baseline persist in SQLite and survive restarts. Live Robinhood balances are not written here.</p>
+    <p>Cash <span class="stat">{{ paper.cash }}</span> · equity <span class="stat">{{ paper.equity }}</span></p>
+    <p class="note">Starting cash (reset baseline) {{ paper.starting_cash }} · account {{ paper.name }}</p>
+    {% if paper.holdings %}
+      <table>
+        <thead><tr><th>Asset</th><th>Qty</th><th>Mark</th></tr></thead>
+        <tbody>
+        {% for asset, qty in paper.holdings %}
+          <tr>
+            <td>{{ asset }}</td>
+            <td>{{ qty }}</td>
+            <td>{% if paper.marks.get(asset) %}{{ paper.marks[asset] }}{% else %}n/a{% endif %}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="note">No paper holdings.</p>
+    {% endif %}
+
+    <form class="admin" method="post" action="/paper/account">
+      <fieldset>
+        <legend>Set ledger</legend>
+        <div class="settings">
+          <div><label for="paper_name">Account name</label><input id="paper_name" name="name" value="{{ paper.name }}" maxlength="64"></div>
+          <div><label for="paper_cash">Cash (USD)</label><input id="paper_cash" name="cash" value="{{ paper.cash }}" inputmode="decimal"></div>
+          <div><label for="paper_starting_cash">Starting cash (reset to this)</label><input id="paper_starting_cash" name="starting_cash" value="{{ paper.starting_cash }}" inputmode="decimal"></div>
+        </div>
+        <div class="row">
+          <button type="submit">Save paper account</button>
+        </div>
+      </fieldset>
+    </form>
+
+    <div class="settings">
+      <form method="post" action="/paper/deposit">
+        <fieldset>
+          <legend>Deposit</legend>
+          <label for="deposit_amount">Amount</label>
+          <input id="deposit_amount" name="amount" inputmode="decimal" required>
+          <div class="row"><button type="submit">Deposit</button></div>
+        </fieldset>
+      </form>
+      <form method="post" action="/paper/withdraw">
+        <fieldset>
+          <legend>Withdraw</legend>
+          <label for="withdraw_amount">Amount</label>
+          <input id="withdraw_amount" name="amount" inputmode="decimal" required>
+          <div class="row"><button type="submit">Withdraw</button></div>
+        </fieldset>
+      </form>
+      <form method="post" action="/paper/holding">
+        <fieldset>
+          <legend>Set holding</legend>
+          <label for="holding_asset">Asset</label>
+          <input id="holding_asset" name="asset" value="{{ cfg.symbol.split('-')[0] }}" required>
+          <label for="holding_qty">Qty (0 removes)</label>
+          <input id="holding_qty" name="qty" inputmode="decimal" required>
+          <div class="row"><button type="submit">Set holding</button></div>
+        </fieldset>
+      </form>
+    </div>
+
+    <form method="post" action="/paper/reset" onsubmit="return confirm('Reset the paper account to starting cash, clear holdings, and close open positions?');">
+      <fieldset>
+        <legend>Reset paper account</legend>
+        <p class="note">Restores cash to the starting baseline, clears holdings, and closes open positions without a market sell.</p>
+        <label><input type="checkbox" name="reset_risk" value="on" checked> Also reset daily / weekly / cumulative risk counters and clear STOP</label>
+        <label><input type="checkbox" name="wipe_history" value="on"> Also wipe trade and order history</label>
+        <div class="row">
+          <button class="danger" type="submit">Reset paper account</button>
+        </div>
+      </fieldset>
+    </form>
+  {% else %}
+    <p class="note">Live mode is on. Paper cash, deposits, holdings, and ledger reset are disabled so a real Robinhood balance cannot be overwritten from this panel.</p>
+  {% endif %}
+</section>
+
+<section class="card" style="margin-top:1rem">
   <h2>Admin · settings</h2>
   <p class="note">Hard ceilings from the environment: notional ≤ {{ env.max_notional_usd }}, daily ≤ {{ env.max_daily_loss_usd }}, weekly ≤ {{ env.max_weekly_loss_usd }}, cumulative ≤ {{ env.max_cumulative_loss_usd }}, poll ≥ {{ env.min_poll_interval_sec }}s.</p>
-  {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
   <form class="admin" method="post" action="/settings">
     <fieldset>
       <legend>Mode and market</legend>
@@ -75,7 +157,6 @@
         <div><label for="daily_loss_limit_usd">Daily loss</label><input id="daily_loss_limit_usd" name="daily_loss_limit_usd" value="{{ cfg.daily_loss_limit_usd }}"></div>
         <div><label for="weekly_loss_limit_usd">Weekly loss</label><input id="weekly_loss_limit_usd" name="weekly_loss_limit_usd" value="{{ cfg.weekly_loss_limit_usd }}"></div>
         <div><label for="cumulative_loss_limit_usd">Cumulative loss</label><input id="cumulative_loss_limit_usd" name="cumulative_loss_limit_usd" value="{{ cfg.cumulative_loss_limit_usd }}"></div>
-        <div><label for="paper_starting_cash">Paper starting cash</label><input id="paper_starting_cash" name="paper_starting_cash" value="{{ cfg.paper_starting_cash }}"></div>
       </div>
     </fieldset>
 

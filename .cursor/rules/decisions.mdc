@@ -7,6 +7,13 @@ alwaysApply: false
 
 Record choices that later agents should not silently reverse. Newest first.
 
+## 2026-10-11 — Paper account is a full ledger
+
+- **Decision:** Paper cash, starting cash, and holdings persist in SQLite (`paper_account` + `paper_holdings`). Admin can set cash, deposit/withdraw, edit holdings, and reset to the starting baseline (optional history wipe + risk reset). Live mode is read-only for this panel.
+- **Why:** Paper trading is the product. Restarting the bot used to throw away cash; operators need to resize the simulated book without touching Robinhood.
+- **Alternatives rejected:** In-memory cash only; tying the ledger to `paper_starting_cash` with no current-cash editor.
+- **Revisit when:** First live week, or if a second paper book is needed.
+
 ## 2026-10-11 — Crypto day-trader bot
 
 - **Decision:** Paper-by-default FastAPI bot. Coinbase OHLC for indicators in backtest and live; Robinhood v2 bid/ask only for fills, exits, and a quote archive. No unofficial Robinhood libraries. Gemini news filter cut from v1.
